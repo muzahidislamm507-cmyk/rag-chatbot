@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<title>RAG চ্যাট</title>
+<style>
+  body { font-family: sans-serif; max-width: 700px; margin: 40px auto; background:#f5f5f7; }
+  h2 { text-align: center; }
+  #chat { background: white; border-radius: 10px; padding: 16px; height: 420px; overflow-y: auto; box-shadow: 0 1px 4px rgba(0,0,0,.1); }
+  .msg { margin: 10px 0; line-height: 1.5; }
+  .user { text-align: right; color: #1a73e8; }
+  .bot { text-align: left; color: #222; }
+  .sources { font-size: 12px; color: #888; margin-top: 4px; }
+  #inputRow { display: flex; margin-top: 12px; gap: 8px; }
+  #query { flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #ccc; }
+  button { padding: 10px 18px; border: none; border-radius: 8px; background: #1a73e8; color: white; cursor: pointer; }
+  button:disabled { background: #aaa; }
+  #resetBtn { background: #888; font-size: 12px; padding: 6px 12px; }
+  .topRow { display: flex; justify-content: space-between; align-items: center; }
+
+  #docsPanel { background: white; border-radius: 10px; padding: 14px 16px; margin-top: 14px; box-shadow: 0 1px 4px rgba(0,0,0,.1); }
+  #docsPanel summary { cursor: pointer; font-weight: bold; color: #333; }
+  #docsList { margin: 10px 0; font-size: 14px; }
+  .docItem { display: flex; justify-content: space-between; padding: 4px 0; color: #444; border-bottom: 1px solid #f0f0f0; }
+  .docItem:last-child { border-bottom: none; }
+  .docChunks { color: #999; font-size: 12px; }
+  #uploadBtn { background: #34a853; font-size: 13px; padding: 8px 14px; margin-top: 8px; }
+  #uploadBtn:disabled { background: #aaa; }
+  #uploadStatus { font-size: 13px; margin-top: 6px; color: #666; }
+</style>
+</head>
+<body>
+  <div class="topRow">
+    <h2>📚 RAG চ্যাটবট</h2>
+    <button id="resetBtn" onclick="resetSession()">🔄 নতুন কথোপকথন</button>
+  </div>
+  <div id="chat"></div>
+  <div id="inputRow">
+    <input id="query" type="text" placeholder="প্রশ্ন লিখুন..." />
+    <button id="sendBtn" onclick="sendQuery()">পাঠান</button>
+  </div>
+
+  <!-- #Document Management UI: ইনডেক্স হওয়া ডকুমেন্টের তালিকা + নতুন ফাইল আপলোড -->
+  <details id="docsPanel" open>
+    <summary>📁 ইনডেক্স করা ডকুমেন্ট</summary>
+    <div id="docsList">লোড হচ্ছে...</div>
+    <input type="file" id="fileInput" accept=".txt,.pdf" style="display:none" onchange="uploadFile()" />
+    <button id="uploadBtn" onclick="document.getElementById('fileInput').click()">➕ নতুন ডকুমেন্ট আপলোড</button>
+    <div id="uploadStatus"></div>
+  </details>
+
+<script>
+const chat = document.getElementById('chat');
+const input = document.getElementById('query');
+const btn = document.getElementById('sendBtn');
+let sessionId = null;  // #Conversation Memory: সার্ভার প্রথম উত্তরে এটা দেবে, তারপর থেকে প্রতি রিকোয়েস্টে পাঠানো হবে
+
+function resetSession() {
+  if (sessionId) {
+    fetch('/reset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: sessionId })
+    });
+  }
+  sessionId = null;
+  chat.innerHTML = '';
+}
+
+function addMessage(text, cls, sources) {
+  const div = document.createElement('div');
+  div.className = 'msg ' + cls;
+  div.textContent = text;
+  chat.appendChild(div);
+  if (sources && sources.length) {
+    const s = document.createElement('div');
+    s.className = 'sources';
+    s.textContent = '📎 সূত্র: ' + sources.join(', ');
+    chat.appendChild(s);
+  }
+  chat.scrollTop = chat.scrollHeight;
+  return div;
+}
+
+async function sendQuery() {
+  const q = input.value.trim();
+  if (!q) return;
+  addMessage(q, 'user');
+  input.value = '';
+  btn.disabled = true;
+
+  // #Streaming Answer: একটা খালি বাবল বানিয়ে রাখি, তারপর টুকরো টুকরো টেক্সট এসে ওটা ভরবে
+  const botDiv = addMessage('', 'bot');
+  let fullText = '';
+
+  try {
+    const res = await fetch('/ask/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: q, session_id: sessionId })
+    });
+    if (!res.ok || !res.body) {
+      const err = await res.json().catch(() => ({}));
+      botDiv.textContent = '❌ ' + (err.detail || 'একটা সমস্যা হয়েছে');
+      return;
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      // ndjson: প্রতিটা সম্পূর্ণ লাইন একটা JSON event
+      let lines = buffer.split('\n');
+      buffer = lines.pop();  // শেষ (অসম্পূর্ণ) অংশটা পরের চাঙ্কের জন্য রেখে দিই
+
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        const event = JSON.parse(line);
+        if (event.type === 'session') {
+          sessionId = event.session_id;
+        } else if (event.type === 'chunk') {
+          fullText += event.text;
+          botDiv.textContent = fullText;
+          chat.scrollTop = chat.scrollHeight;
+        } else if (event.type === 'error') {
+          botDiv.textContent = '❌ ' + event.text;
+        } else if (event.type === 'done' && event.sources && event.sources.length) {
+          const s = document.createElement('div');
+          s.className = 'sources';
+          s.textContent = '📎 সূত্র: ' + event.sources.join(', ');
+          chat.appendChild(s);
+        }
+      }
+    }
+  } catch (e) {
+    botDiv.textContent = '❌ সার্ভারে পৌঁছানো যাচ্ছে না।';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+input.addEventListener('keydown', (e) => { if (e.key === 'Enter') sendQuery(); });
+
+// #Document Management UI
+async function loadDocuments() {
+  const docsList = document.getElementById('docsList');
+  try {
+    const res = await fetch('/documents');
+    if (!res.ok) throw new Error('HTTP ' + res.status);  // আগে 404 হলেও "কোনো ডকুমেন্ট নেই" দেখাত
+    const data = await res.json();
+    if (!data.documents || data.documents.length === 0) {
+      docsList.textContent = 'এখনো কোনো ডকুমেন্ট ইনডেক্স করা হয়নি।';
+      return;
+    }
+    docsList.innerHTML = '';
+    data.documents.forEach(doc => {
+      const row = document.createElement('div');
+      row.className = 'docItem';
+      // textContent ব্যবহার: ফাইলের নাম কখনো HTML হিসেবে চলবে না (XSS প্রতিরোধ)
+      const nameEl = document.createElement('span');
+      nameEl.textContent = '📄 ' + doc.name;
+      const chunksEl = document.createElement('span');
+      chunksEl.className = 'docChunks';
+      chunksEl.textContent = doc.chunks + ' চাঙ্ক';
+      row.append(nameEl, chunksEl);
+      docsList.appendChild(row);
+    });
+  } catch (e) {
+    docsList.textContent = 'ডকুমেন্ট তালিকা লোড করা যায়নি।';
+  }
+}
+
+async function uploadFile() {
+  const fileInput = document.getElementById('fileInput');
+  const status = document.getElementById('uploadStatus');
+  const uploadBtn = document.getElementById('uploadBtn');
+  const file = fileInput.files[0];
+  if (!file) return;
+
+  const formData = new FormData();
+  formData.append('file', file);
+
+  uploadBtn.disabled = true;
+  status.textContent = `⏳ "${file.name}" আপলোড ও ইনডেক্স হচ্ছে... (একটু সময় লাগতে পারে)`;
+
+  try {
+    const res = await fetch('/upload', { method: 'POST', body: formData });
+    const data = await res.json();
+    if (!res.ok) {
+      status.textContent = '❌ ' + (data.detail || 'আপলোড ব্যর্থ হয়েছে');
+      return;
+    }
+    status.textContent = `✅ "${data.filename}" যোগ হয়েছে।`;
+    loadDocuments();
+  } catch (e) {
+    status.textContent = '❌ সার্ভারে পৌঁছানো যাচ্ছে না।';
+  } finally {
+    uploadBtn.disabled = false;
+    fileInput.value = '';
+  }
+}
+
+loadDocuments();  // পেজ লোড হওয়ার সাথে সাথেই তালিকা দেখাও
+</script>
+</body>
+</html>

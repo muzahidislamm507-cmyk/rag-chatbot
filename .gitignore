@@ -1,0 +1,12 @@
+# Secrets — কখনো git-এ commit হবে না
+.env
+
+# Generated / cache ফাইল
+__pycache__/
+*.pyc
+vector_store.index
+chunks.pkl
+rag_pipeline.log
+
+# Local model download cache
+.cache/

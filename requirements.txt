@@ -1,0 +1,9 @@
+python-dotenv
+sentence-transformers
+faiss-cpu
+rank_bm25
+pypdf
+google-genai
+fastapi
+uvicorn[standard]
+pydantic
