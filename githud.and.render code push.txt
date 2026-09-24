@@ -1,0 +1,20 @@
+cd C:\Users\Muzahid\Downloads\rag_demo_v2\rag_demo_v2
+
+git add .
+
+git commit -m "Switch to Gemini embeddings to fix OOM"
+
+git push
+
+
+
+
+
+
+
+
+
+AI-এর ইতিহাস 
+কৃত্রিম বুদ্ধিমত্তা কী?
+AI-এর শীতকাল (AI Winter)
+
