@@ -29,10 +29,10 @@ from dataclasses import dataclass, field
 import numpy as np
 import faiss
 from dotenv import load_dotenv
-from sentence_transformers import SentenceTransformer
 from rank_bm25 import BM25Okapi
 from google import genai
 from google.genai import errors as genai_errors
+from google.genai import types as genai_types
 
 load_dotenv()
 
@@ -50,7 +50,12 @@ logging.basicConfig(
 logger = logging.getLogger("rag_pipeline")
 
 gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-embedding_model = SentenceTransformer("paraphrase-multilingual-MiniLM-L12-v2")
+
+# #RAM Fix: আগে এখানে একটা লোকাল SentenceTransformer মডেল লোড হতো, যেটা
+# torch/transformers-সহ অনেক RAM খেত (৫১২ MB ফ্রি-টায়ারে OOM crash করাচ্ছিল)।
+# এখন embedding Gemini-এর API দিয়েই বানানো হয় (নিচে create_embeddings দেখুন),
+# তাই লোকাল কোনো ML মডেল লোড করার দরকার নেই।
+EMBEDDING_MODEL = "gemini-embedding-001"
 
 GEMINI_MODEL = "gemini-3.5-flash"
 INDEX_PATH = "vector_store.index"
@@ -166,12 +171,38 @@ def chunk_text(text: str, chunk_size: int = 500, overlap: int = 50) -> list[str]
 
 
 # ---------------------------------------------------------
-# ধাপ ৩: Embedding
+# ধাপ ৩: Embedding (Gemini API দিয়ে — লোকাল মডেল লাগে না, তাই RAM কম লাগে)
 # ---------------------------------------------------------
-def create_embeddings(texts: list[str]) -> np.ndarray:
+_EMBED_BATCH_SIZE = 100  # একবারে বেশি টেক্সট পাঠালে API রিজেক্ট করতে পারে, তাই ব্যাচে ভাগ করা হয়
+
+
+def create_embeddings(texts: list[str], task_type: str = "RETRIEVAL_DOCUMENT") -> np.ndarray:
+    """
+    Gemini-এর embed_content API দিয়ে embedding বানায়।
+    task_type: ডকুমেন্ট চাঙ্ক embed করলে "RETRIEVAL_DOCUMENT",
+               ইউজারের প্রশ্ন embed করলে "RETRIEVAL_QUERY" — এতে Gemini
+               দুটোর জন্য একটু আলাদাভাবে অপ্টিমাইজড ভেক্টর বানায়।
+    """
+    if not texts:
+        return np.zeros((0, 0), dtype="float32")
     try:
-        vectors = embedding_model.encode(texts, convert_to_numpy=True, normalize_embeddings=True)
-        return vectors.astype("float32")
+        all_vectors: list[list[float]] = []
+        for i in range(0, len(texts), _EMBED_BATCH_SIZE):
+            batch = texts[i:i + _EMBED_BATCH_SIZE]
+            response = gemini_client.models.embed_content(
+                model=EMBEDDING_MODEL,
+                contents=batch,
+                config=genai_types.EmbedContentConfig(task_type=task_type),
+            )
+            all_vectors.extend(e.values for e in response.embeddings)
+
+        vectors = np.array(all_vectors, dtype="float32")
+        # FAISS IndexFlatIP (inner product) দিয়ে cosine similarity পেতে হলে
+        # ভেক্টরগুলো normalize (unit length) হওয়া দরকার — আগে
+        # normalize_embeddings=True দিয়ে এটা করা হতো, এখানে ম্যানুয়ালি করা হচ্ছে
+        norms = np.linalg.norm(vectors, axis=1, keepdims=True)
+        norms[norms == 0] = 1  # শূন্য দিয়ে ভাগ এড়াতে
+        return vectors / norms
     except Exception as e:
         logger.error(f"Embedding তৈরি করতে সমস্যা হয়েছে: {e}")
         raise
@@ -266,7 +297,7 @@ def _hybrid_candidates(query: str, index, chunks: list[Chunk], k: int) -> list[C
       - Vector search (FAISS): semantic মিল খুঁজে বের করে
       - BM25 keyword search: exact শব্দ/নাম মিল ধরতে ভালো (vector মাঝে মাঝে মিস করে)
     """
-    query_embedding = create_embeddings([query])
+    query_embedding = create_embeddings([query], task_type="RETRIEVAL_QUERY")
     _, vec_indices = index.search(query_embedding, k)
     vec_ranked = list(vec_indices[0])
 
@@ -318,10 +349,15 @@ def rerank_chunks(query: str, candidates: list[Chunk], top_k: int) -> list[Chunk
 
 
 def retrieve_relevant_chunks(query: str, index, chunks: list[Chunk], top_k: int = 5,
-                              use_reranker: bool = True, candidate_multiplier: int = 4) -> list[Chunk]:
+                              use_reranker: bool = False, candidate_multiplier: int = 4) -> list[Chunk]:
     """
     ধাপ ১: hybrid (vector+BM25) সার্চ দিয়ে top_k-এর চেয়ে বেশি candidate আনা হয়
-    ধাপ ২: cross-encoder reranker দিয়ে সেগুলো থেকে সবচেয়ে প্রাসঙ্গিক top_k বাছাই করা হয়
+    ধাপ ২: (ঐচ্ছিক) cross-encoder reranker দিয়ে সেগুলো থেকে সবচেয়ে প্রাসঙ্গিক top_k বাছাই করা হয়
+
+    #RAM Fix: use_reranker ডিফল্টে False রাখা হয়েছে — cross-encoder reranker
+    লোড হতে sentence-transformers/torch লাগে, যেটা ৫১২ MB ফ্রি-টায়ারে আবার
+    OOM ঘটাতে পারে। বেশি RAM-এর সার্ভারে (paid প্ল্যান/নিজের সার্ভার) হলে
+    এটা True করে দিলে উত্তরের quality আরেকটু ভালো হবে।
     """
     if not chunks:
         return []
