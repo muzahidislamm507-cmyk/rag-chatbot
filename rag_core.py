@@ -75,7 +75,7 @@ class Chunk:
 # ধাপ ১: একাধিক ডকুমেন্ট লোড করা
 # ---------------------------------------------------------
 def load_document(file_path: str) -> str:
-    """txt বা pdf ফাইল থেকে সব টেক্সট বের করে একটা স্ট্রিং হিসেবে ফেরত দেয়।"""
+    """txt, pdf বা docx ফাইল থেকে সব টেক্সট বের করে একটা স্ট্রিং হিসেবে ফেরত দেয়।"""
     try:
         if file_path.endswith(".pdf"):
             from pypdf import PdfReader
@@ -84,6 +84,17 @@ def load_document(file_path: str) -> str:
             for page in reader.pages:
                 text += (page.extract_text() or "") + "\n"
             return text
+        elif file_path.endswith(".docx"):
+            from docx import Document
+            doc = Document(file_path)
+            parts = [p.text for p in doc.paragraphs if p.text.strip()]
+            # table-এর ভেতরের লেখাও নেওয়া হচ্ছে
+            for table in doc.tables:
+                for row in table.rows:
+                    cells = [c.text.strip() for c in row.cells if c.text.strip()]
+                    if cells:
+                        parts.append(" | ".join(cells))
+            return "\n".join(parts)
         else:
             with open(file_path, "r", encoding="utf-8") as f:
                 return f.read()
@@ -94,7 +105,6 @@ def load_document(file_path: str) -> str:
         logger.error(f"ফাইল লোড করতে সমস্যা ({file_path}): {e}")
         raise
 
-
 def load_documents_from_folder(folder_path: str = DOCS_FOLDER) -> list[tuple[str, str]]:
     """
     একটা ফোল্ডারের সব .txt আর .pdf ফাইল লোড করে (filename, text) জোড়ার
@@ -103,9 +113,12 @@ def load_documents_from_folder(folder_path: str = DOCS_FOLDER) -> list[tuple[str
     if not Path(folder_path).is_dir():
         logger.warning(f"'{folder_path}' ফোল্ডার পাওয়া যায়নি।")
         return []
-
-    file_paths = glob.glob(os.path.join(folder_path, "*.txt")) + \
-        glob.glob(os.path.join(folder_path, "*.pdf"))
+        
+    file_paths = (
+        glob.glob(os.path.join(folder_path, "*.txt"))
+        + glob.glob(os.path.join(folder_path, "*.pdf"))
+        + glob.glob(os.path.join(folder_path, "*.docx"))
+    )
 
     results = []
     for fp in sorted(file_paths):
@@ -116,7 +129,6 @@ def load_documents_from_folder(folder_path: str = DOCS_FOLDER) -> list[tuple[str
         except Exception:
             logger.warning(f"স্কিপ করা হলো (লোড ব্যর্থ): {fp}")
     return results
-
 
 # ---------------------------------------------------------
 # ধাপ ২: Sentence/paragraph-boundary-aware চাঙ্কিং

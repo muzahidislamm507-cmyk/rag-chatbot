@@ -179,7 +179,7 @@ def reset_session(req: dict):
 # (static/index.html আগে থেকেই /documents আর /upload কল করছিল)
 # ---------------------------------------------------------
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024   # ৫০ MB
-ALLOWED_EXTENSIONS = (".txt", ".pdf")
+ALLOWED_EXTENSIONS = (".txt", ".pdf", ".docx")
 _upload_lock = threading.Lock()       # একসাথে দুটো আপলোড ইনডেক্স বদলাতে পারবে না
 
 
