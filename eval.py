@@ -19,21 +19,41 @@
 from rag_core import get_or_build_index, answer_query
 
 TEST_CASES = [
+    # --- প্রোডাক্ট ক্যাটালগ (এক প্রোডাক্ট = এক চাঙ্ক, তাই রং/দাম ঠিক প্রোডাক্টের সাথে আসা উচিত) ---
     {
-        "question": "বাংলাদেশে AI-এর সম্ভাবনা কী কী?",
-        "expected_keywords": ["কৃষি", "ব্যাংকিং", "চ্যাটবট"],
+        "question": "Oversized Hoodie কী কী রঙে পাওয়া যায়?",
+        "expected_keywords": ["Cream", "Dusty Pink"],
     },
     {
-        "question": "টুরিং টেস্ট কী?",
-        "expected_keywords": ["টুরিং", "১৯৫০"],
+        "question": "Slim Fit Jeans-এর দাম কত?",
+        "expected_keywords": ["64.99", "৬৪.৯৯"],
+    },
+    # --- পলিসি ---
+    {
+        "question": "রিটার্ন করার সময়সীমা কত দিন?",
+        "expected_keywords": ["30", "৩০"],
     },
     {
-        "question": "AI Winter কখন হয়েছিল?",
-        "expected_keywords": ["১৯৭০", "১৯৮০"],
+        "question": "US-এ standard shipping-এ কত দিন লাগে আর খরচ কত?",
+        "expected_keywords": ["3-5", "৩-৫", "4.99", "৪.৯৯"],
+    },
+    # --- Final Sale (ক্যাটালগ + পলিসি + CURRENT SALE চাঙ্ক মিলিয়ে) ---
+    {
+        "question": "মোজা কি ফেরত দেওয়া যায়?",
+        "expected_keywords": ["Final Sale", "ফাইনাল সেল", "যাবে না", "যায় না"],
+    },
+    {
+        "question": "Navy রঙের Puffer Vest কি ফেরত দেওয়া যাবে?",
+        "expected_keywords": ["Final Sale", "ফাইনাল সেল", "যাবে না", "যায় না"],
+    },
+    # --- FAQ ---
+    {
+        "question": "WELCOME10 কোড দিয়ে কত ছাড় পাওয়া যায়?",
+        "expected_keywords": ["10%", "১০%", "10 শতাংশ", "১০ শতাংশ"],
     },
     # ডকুমেন্টে নেই এমন প্রশ্ন — মডেল যেন হ্যালুসিনেট না করে সেটা চেক করতে
     {
-        "question": "বাংলাদেশের রাজধানীর জনসংখ্যা কত?",
+        "question": "UrbanWear-এর CEO কে?",
         "expected_keywords": ["পাওয়া যায়নি"],
     },
 ]

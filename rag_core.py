@@ -34,6 +34,8 @@ from google import genai
 from google.genai import errors as genai_errors
 from google.genai import types as genai_types
 
+from chunker import chunk_document
+
 load_dotenv()
 
 # ---------------------------------------------------------
@@ -204,6 +206,20 @@ def chunk_text(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVE
     return [c.strip() for c in chunks if c.strip()]
 
 
+def chunk_file(filename: str, text: str) -> list[str]:
+    """
+    গঠন-সচেতন চাঙ্কিং (chunker.py): ক্যাটালগ / FAQ / পলিসি / সেকশনযুক্ত ডকুমেন্ট চেনা গেলে
+    গঠন ধরে ভাগ করে (১ প্রোডাক্ট / ১ Q+A / ১ সেকশন = ১ চাঙ্ক) এবং প্রতিটার শুরুতে
+    [ডকুমেন্ট > সেকশন] প্রিফিক্স বসায়।
+    গঠন চেনা না গেলে (যেমন সাধারণ PDF/বই) আগের sentence-aware chunk_text-ই চলে।
+    """
+    structured = chunk_document(filename, text)
+    if structured and any(c["metadata"]["type"] != "generic" for c in structured):
+        return [c["text"] for c in structured]
+    doc = structured[0]["metadata"]["doc"] if structured else Path(filename).stem
+    return [f"[{doc}]\n{t}" for t in chunk_text(text)]
+
+
 # ---------------------------------------------------------
 # ধাপ ৩: Embedding (Gemini API দিয়ে — লোকাল মডেল লাগে না, তাই RAM কম লাগে)
 # ---------------------------------------------------------
@@ -281,7 +297,7 @@ def add_document_to_store(file_path: str, index, chunks: list[Chunk]):
     logger.info(f"➕ নতুন ডকুমেন্ট যোগ হচ্ছে: {file_path}")
     try:
         text = load_document(file_path)
-        new_texts = chunk_text(text)
+        new_texts = chunk_file(os.path.basename(file_path), text)
         new_chunks = [Chunk(text=t, source=os.path.basename(file_path)) for t in new_texts]
         new_embeddings = create_embeddings(new_texts)
 
@@ -308,7 +324,7 @@ def build_index_from_folder(folder_path: str = DOCS_FOLDER):
 
     all_chunks: list[Chunk] = []
     for filename, text in docs:
-        texts = chunk_text(text)
+        texts = chunk_file(filename, text)
         all_chunks.extend(Chunk(text=t, source=filename) for t in texts)
         logger.info(f"   {filename}: {len(texts)}টা চাঙ্ক")
 
@@ -705,4 +721,3 @@ def get_or_build_index():
         index, chunks = build_index_from_folder()
         save_vector_store(index, chunks)
     return index, chunks
-

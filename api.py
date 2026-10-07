@@ -17,12 +17,13 @@ import re
 import time
 import uuid
 import json
+import hmac
 import threading
 from collections import defaultdict, deque
 
 import faiss
 import numpy as np
-from fastapi import FastAPI, HTTPException, Request, UploadFile, File
+from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Depends, Header
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -30,7 +31,7 @@ from pydantic import BaseModel, Field
 from rag_core import (
     logger, get_or_build_index, answer_query, sanitize_query,
     create_chat_session, RagSession, stream_answer_query,
-    Chunk, DOCS_FOLDER, load_document, chunk_text, create_embeddings,
+    Chunk, DOCS_FOLDER, load_document, chunk_file, create_embeddings,
     save_vector_store,
 )
 
@@ -208,7 +209,7 @@ def _add_document_atomically(path: str, filename: str) -> int:
     """
     global INDEX, CHUNKS
     text = load_document(path)
-    texts = chunk_text(text)
+    texts = chunk_file(filename, text)
     if not texts:
         raise ValueError("ফাইলে কোনো পড়ার মতো টেক্সট পাওয়া যায়নি (স্ক্যান করা PDF হলে টেক্সট থাকে না)।")
 
@@ -252,7 +253,26 @@ def _remove_document_atomically(filename: str) -> int:
     return removed
 
 
-@app.delete("/documents/{filename:path}")
+# ---------------------------------------------------------
+# Admin অথেন্টিকেশন: /upload আর DELETE /documents শুধু ADMIN_KEY জানা লোকের জন্য
+# ক্লায়েন্ট হেডার পাঠায়:  X-Admin-Key: <আপনার ADMIN_KEY>
+# ADMIN_KEY সেট না থাকলে দুটো এন্ডপয়েন্টই বন্ধ (fail closed), যাতে ভুল করে খোলা না থাকে।
+# ---------------------------------------------------------
+ADMIN_KEY = os.getenv("ADMIN_KEY", "")
+
+
+def require_admin(request: Request, x_admin_key: str = Header(default="")):
+    client_ip = request.client.host if request.client else "unknown"
+    if not ADMIN_KEY:
+        logger.error("ADMIN_KEY সেট করা নেই — আপলোড/ডিলিট বন্ধ রাখা হলো।")
+        raise HTTPException(status_code=503, detail="সার্ভারে ADMIN_KEY সেট করা নেই, তাই এই কাজ বন্ধ আছে।")
+    if not hmac.compare_digest(x_admin_key.encode("utf-8"), ADMIN_KEY.encode("utf-8")):
+        logger.warning(f"🚫 ভুল/খালি admin key ({request.method} {request.url.path}) IP: {client_ip}")
+        check_rate_limit(client_ip)  # ভুল চেষ্টা বেশি হলে 429 — key আন্দাজ করা কঠিন করে
+        raise HTTPException(status_code=401, detail="অনুমতি নেই — সঠিক admin key দিন।")
+
+
+@app.delete("/documents/{filename:path}", dependencies=[Depends(require_admin)])
 def delete_document(filename: str, request: Request):
     client_ip = request.client.host if request.client else "unknown"
     check_rate_limit(client_ip)
@@ -277,7 +297,7 @@ def delete_document(filename: str, request: Request):
     return {"deleted": filename, "chunks_removed": removed, "total_chunks": len(CHUNKS)}
 
 
-@app.post("/upload")
+@app.post("/upload", dependencies=[Depends(require_admin)])
 def upload_document(request: Request, file: UploadFile = File(...)):
     client_ip = request.client.host if request.client else "unknown"
     check_rate_limit(client_ip)
