@@ -1,0 +1,111 @@
+URBANWEAR - PRODUCT CATALOG
+(Demo store. All products and prices are fictional.)
+
+Product 1: Classic Cotton Tee (UW-101)
+Price: $24.99
+Material: 100% organic cotton
+Colors: White, Black, Navy, Grey
+Sizes: S-XXL (men's)
+Care: Machine wash cold, tumble dry low.
+
+Product 2: Everyday Hoodie (UW-102)
+Price: $54.99
+Material: 80% cotton, 20% polyester fleece
+Colors: Black, Charcoal, Forest Green
+Sizes: S-XXL (men's)
+Care: Machine wash cold, do not bleach.
+
+Product 3: Oversized Hoodie (UW-103)
+Price: $59.99
+Material: 100% heavyweight cotton
+Colors: Cream, Black, Dusty Pink
+Sizes: S-XL (unisex)
+Care: Machine wash cold, tumble dry low.
+
+Product 4: Slim Fit Jeans (UW-201)
+Price: $64.99
+Material: 98% cotton, 2% elastane (stretch denim)
+Colors: Dark Blue, Light Blue, Black
+Sizes: Waist 30-36, inseam 30/32/34
+Care: Machine wash inside out in cold water.
+
+Product 5: Relaxed Chino Pants (UW-202)
+Price: $59.99
+Material: 97% cotton, 3% elastane
+Colors: Khaki, Olive, Navy
+Sizes: Waist 30-36, inseam 30/32/34
+Care: Machine wash warm, iron on medium if needed.
+
+Product 6: Linen Summer Dress (UW-301)
+Price: $79.99
+Material: 100% linen
+Colors: White, Sand, Sage Green
+Sizes: XS-XL (women's)
+Care: Machine wash cold, hang dry. Linen wrinkles naturally.
+
+Product 7: Women's Ribbed Tank (UW-302)
+Price: $19.99
+Material: 95% cotton, 5% elastane
+Colors: White, Black, Beige
+Sizes: XS-XL (women's)
+Care: Machine wash cold, lay flat to dry.
+
+Product 8: Wrap Midi Skirt (UW-303)
+Price: $49.99
+Material: 100% viscose
+Colors: Black, Rust, Emerald
+Sizes: XS-XL (women's)
+Care: Hand wash cold or dry clean.
+
+Product 9: Waterproof Rain Jacket (UW-401)
+Price: $99.99
+Material: Recycled polyester shell with waterproof coating
+Colors: Black, Olive, Yellow
+Sizes: S-XXL (unisex)
+Care: Machine wash cold, do not use fabric softener.
+
+Product 10: Puffer Vest (UW-402)
+Price: $84.99
+Material: Recycled polyester fill and shell
+Colors: Black, Navy
+Sizes: S-XXL (unisex)
+Care: Machine wash cold, tumble dry low with dryer balls.
+
+Product 11: Merino Wool Sweater (UW-403)
+Price: $89.99
+Material: 100% merino wool
+Colors: Grey, Camel, Dark Green
+Sizes: S-XL (unisex)
+Care: Hand wash cold or dry clean. Lay flat to dry.
+
+Product 12: Canvas Tote Bag (UW-501)
+Price: $22.99
+Material: Heavy cotton canvas
+Colors: Natural, Black
+Size: One size (15 x 16 in)
+Care: Spot clean.
+
+Product 13: Leather Belt (UW-502)
+Price: $34.99
+Material: Genuine leather, brushed metal buckle
+Colors: Black, Brown
+Sizes: S, M, L, XL
+Care: Wipe with a dry cloth.
+
+Product 14: Wool Beanie (UW-503)
+Price: $18.99
+Material: 100% wool
+Colors: Charcoal, Mustard, Navy
+Size: One size
+Care: Hand wash cold.
+
+Product 15: Cotton Crew Socks, 3-Pack (UW-504)
+Price: $14.99
+Material: 80% cotton, 18% nylon, 2% elastane
+Colors: White, Black, Grey (3-pack in one color)
+Size: One size (fits US 7-12)
+Care: Machine wash warm.
+Note: Socks are Final Sale and cannot be returned.
+
+CURRENT SALE
+Items marked "Final Sale": Puffer Vest (UW-402) in Navy, Wrap Midi Skirt (UW-303) in Rust. These cannot be returned or exchanged.
