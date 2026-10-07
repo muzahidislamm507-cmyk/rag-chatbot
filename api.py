@@ -21,6 +21,7 @@ import threading
 from collections import defaultdict, deque
 
 import faiss
+import numpy as np
 from fastapi import FastAPI, HTTPException, Request, UploadFile, File
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -222,6 +223,58 @@ def _add_document_atomically(path: str, filename: str) -> int:
     CHUNKS = all_chunks
     INDEX = new_index
     return len(new_chunks)
+
+
+def _remove_document_atomically(filename: str) -> int:
+    """
+    #Document Delete: একটা ডকুমেন্টের সব চাঙ্ক ইনডেক্স থেকে সরায়।
+    FAISS flat ইনডেক্স থেকে সরাসরি মোছা যায় না, তাই বাকি ভেক্টরগুলো (reconstruct করে, নতুন করে
+    embed না করে — ফলে API খরচ নেই) দিয়ে নতুন ইনডেক্স বানানো হয়, ডিস্কে সেভ হয়, তারপর মেমরিতে বদলানো হয়।
+    সেভ ব্যর্থ হলে এক্সেপশন উঠে যায় আর মেমরির INDEX/CHUNKS অক্ষত থাকে।
+    """
+    global INDEX, CHUNKS
+    if INDEX.ntotal != len(CHUNKS):
+        raise RuntimeError(f"ইনডেক্স ({INDEX.ntotal}) আর চাঙ্ক লিস্ট ({len(CHUNKS)}) মিলছে না — মোছা বন্ধ করা হলো।")
+
+    keep = [i for i, c in enumerate(CHUNKS) if c.source != filename]
+    removed = len(CHUNKS) - len(keep)
+
+    new_index = faiss.IndexFlatIP(INDEX.d)
+    if keep:
+        vectors = INDEX.reconstruct_n(0, INDEX.ntotal)
+        new_index.add(np.ascontiguousarray(vectors[keep], dtype="float32"))
+    new_chunks = [CHUNKS[i] for i in keep]
+
+    save_vector_store(new_index, new_chunks)
+    # দুটো বদলের মাঝে মাইক্রোসেকেন্ডের একটা ফাঁক থাকে; ছোট/মাঝারি ডেমোর জন্য এটা গ্রহণযোগ্য
+    CHUNKS = new_chunks
+    INDEX = new_index
+    return removed
+
+
+@app.delete("/documents/{filename:path}")
+def delete_document(filename: str, request: Request):
+    client_ip = request.client.host if request.client else "unknown"
+    check_rate_limit(client_ip)
+
+    with _upload_lock:
+        if not any(c.source == filename for c in CHUNKS):
+            raise HTTPException(status_code=404, detail=f"'{filename}' নামে কোনো ইনডেক্স করা ডকুমেন্ট নেই।")
+
+        try:
+            removed = _remove_document_atomically(filename)
+        except Exception as e:
+            logger.exception(f"/documents DELETE এন্ডপয়েন্টে সমস্যা ({filename}): {e}")
+            raise HTTPException(status_code=500, detail="ডকুমেন্ট মুছতে গিয়ে সমস্যা হয়েছে।")
+
+        # docs/ ফোল্ডার থেকেও ফাইলটা সরানো হয়, নইলে সার্ভার রিস্টার্টে ইনডেক্স নতুন করে বানালে ফিরে আসত
+        docs_root = os.path.realpath(DOCS_FOLDER)
+        path = os.path.realpath(os.path.join(DOCS_FOLDER, os.path.basename(filename)))
+        if os.path.dirname(path) == docs_root:
+            _remove_quietly(path)
+
+    logger.info(f"🗑️ ডকুমেন্ট মোছা হলো: {filename} ({removed}টা চাঙ্ক সরানো, বাকি {len(CHUNKS)}টা)")
+    return {"deleted": filename, "chunks_removed": removed, "total_chunks": len(CHUNKS)}
 
 
 @app.post("/upload")
