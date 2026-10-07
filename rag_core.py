@@ -705,3 +705,4 @@ def get_or_build_index():
         index, chunks = build_index_from_folder()
         save_vector_store(index, chunks)
     return index, chunks
+
