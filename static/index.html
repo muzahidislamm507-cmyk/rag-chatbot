@@ -177,6 +177,19 @@ async function sendQuery() {
 
 input.addEventListener('keydown', (e) => { if (e.key === 'Enter') sendQuery(); });
 
+// Admin key: আপলোড/ডিলিটের জন্য লাগে। একবার দিলে এই ট্যাবে মনে রাখে, ট্যাব বন্ধ করলে মুছে যায়।
+function getAdminKey() {
+  let key = sessionStorage.getItem('adminKey');
+  if (!key) {
+    key = prompt('আপলোড/ডিলিটের জন্য Admin key দিন:');
+    if (!key || !key.trim()) return null;
+    key = key.trim();
+    sessionStorage.setItem('adminKey', key);
+  }
+  return key;
+}
+function clearAdminKey() { sessionStorage.removeItem('adminKey'); }
+
 // #Document Management UI
 async function loadDocuments() {
   const docsList = document.getElementById('docsList');
@@ -217,13 +230,16 @@ async function loadDocuments() {
 async function deleteDocument(name, btnEl) {
   const status = document.getElementById('uploadStatus');
   if (!confirm(`"${name}" ডকুমেন্টটা মুছে ফেলবেন? এটা আর ফেরত আনা যাবে না।`)) return;
+  const adminKey = getAdminKey();
+  if (!adminKey) return;
 
   btnEl.disabled = true;
   status.textContent = `⏳ "${name}" মোছা হচ্ছে...`;
   try {
-    const res = await fetch('/documents/' + encodeURIComponent(name), { method: 'DELETE' });
+    const res = await fetch('/documents/' + encodeURIComponent(name), { method: 'DELETE', headers: { 'X-Admin-Key': adminKey } });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
+      if (res.status === 401) clearAdminKey();  // ভুল key হলে পরের বার আবার জিজ্ঞেস করবে
       status.textContent = '❌ ' + (data.detail || 'মোছা ব্যর্থ হয়েছে');
       btnEl.disabled = false;
       return;
@@ -242,6 +258,8 @@ async function uploadFile() {
   const uploadBtn = document.getElementById('uploadBtn');
   const file = fileInput.files[0];
   if (!file) return;
+  const adminKey = getAdminKey();
+  if (!adminKey) { fileInput.value = ''; return; }
 
   const formData = new FormData();
   formData.append('file', file);
@@ -250,9 +268,10 @@ async function uploadFile() {
   status.textContent = `⏳ "${file.name}" আপলোড ও ইনডেক্স হচ্ছে... (একটু সময় লাগতে পারে)`;
 
   try {
-    const res = await fetch('/upload', { method: 'POST', body: formData });
+    const res = await fetch('/upload', { method: 'POST', headers: { 'X-Admin-Key': adminKey }, body: formData });
     const data = await res.json();
     if (!res.ok) {
+      if (res.status === 401) clearAdminKey();
       status.textContent = '❌ ' + (data.detail || 'আপলোড ব্যর্থ হয়েছে');
       return;
     }
