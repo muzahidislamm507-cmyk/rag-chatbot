@@ -36,6 +36,8 @@ from rag_core import (
 )
 
 app = FastAPI(title="RAG API")
+from orders_api import router as orders_router
+app.include_router(orders_router)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # স্টার্টআপেই ইনডেক্স লোড/বানিয়ে মেমরিতে রাখা হয়, প্রতি রিকোয়েস্টে না
