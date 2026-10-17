@@ -149,7 +149,7 @@ async function api(path, opts) {
 async function loadProducts() {
   try {
     PRODUCTS = (await api("/api/products")).products;
-    drawGrid(); drawCart();
+    drawGrid();
   } catch (e) {
     $("grid").innerHTML = '<p class="note">Could not load products. Please refresh the page.</p>';
   }
