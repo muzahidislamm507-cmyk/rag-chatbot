@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UrbanWear</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--paper:#EEF1F4;--ink:#101828;--mute:#5B6678;--line:#D5DBE3;--cobalt:#2D4BFF;--white:#fff}
+*{box-sizing:border-box;margin:0}
+html{scroll-behavior:smooth}
+body{font:16px/1.55 "IBM Plex Sans",system-ui,sans-serif;background:var(--paper);color:var(--ink)}
+h1,h2,h3,.logo{font-family:Archivo,Impact,sans-serif;font-stretch:80%;letter-spacing:-.01em}
+button{font:inherit;cursor:pointer}
+:focus-visible{outline:3px solid var(--cobalt);outline-offset:2px}
+header{display:flex;align-items:center;gap:24px;padding:14px 5vw;background:var(--white);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+.logo{font-size:26px;font-weight:900;margin-right:auto}
+header a{color:var(--ink);text-decoration:none;font-weight:500}
+.cartbtn{background:var(--ink);color:#fff;border:0;border-radius:6px;padding:8px 14px}
+.hero{padding:9vw 5vw 6vw;display:grid;grid-template-columns:1.4fr 1fr;gap:40px;align-items:end}
+.hero h1{font-size:clamp(44px,8vw,104px);line-height:.92;font-weight:900;font-stretch:70%}
+.hero p{color:var(--mute);max-width:42ch;margin:18px 0 24px}
+.btn{display:inline-block;background:var(--cobalt);color:#fff;border:0;border-radius:6px;padding:12px 22px;font-weight:600;text-decoration:none}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.btn.alt{background:transparent;color:var(--ink);border:1.5px solid var(--ink)}
+.perks{list-style:none;padding:0;border-left:3px solid var(--cobalt);padding-left:18px}
+.perks li{padding:6px 0;font-weight:500}
+.perks span{display:block;color:var(--mute);font-weight:400;font-size:14px}
+section{padding:40px 5vw}
+section>h2{font-size:34px;font-weight:800;margin-bottom:18px}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:22px}
+.chip{background:var(--white);border:1px solid var(--line);border-radius:99px;padding:6px 16px}
+.chip[aria-pressed=true]{background:var(--ink);color:#fff;border-color:var(--ink)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:20px}
+.card{background:var(--white);border:1px solid var(--line);border-radius:10px;overflow:hidden;text-align:left;padding:0}
+.sw{height:200px;display:flex;align-items:flex-end;padding:12px;font:900 44px/1 Archivo,sans-serif;font-stretch:62%;color:rgba(255,255,255,.55)}
+.card div.info{padding:12px 14px 16px}
+.card h3{font-size:19px;font-weight:700}
+.price{color:var(--mute);margin-top:2px}
+dialog{border:0;border-radius:12px;padding:0;width:min(520px,92vw);color:var(--ink)}
+dialog::backdrop{background:rgba(16,24,40,.5)}
+.dbody{padding:22px}
+.dbody .sw{height:170px;border-radius:8px;margin-bottom:14px}
+.sizes{display:flex;gap:8px;margin:12px 0 18px}
+.size{min-width:44px;padding:8px;border:1.5px solid var(--line);background:#fff;border-radius:6px}
+.size[aria-pressed=true]{border-color:var(--cobalt);background:var(--cobalt);color:#fff}
+.note{color:var(--mute);font-size:14px;margin-top:10px}
+aside.drawer{position:fixed;top:0;right:0;height:100%;width:min(400px,100%);background:#fff;z-index:8;padding:20px;overflow:auto;transform:translateX(102%);transition:transform .25s;border-left:1px solid var(--line)}
+aside.drawer.open{transform:none}
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
+.qty button{width:28px;height:28px;border:1px solid var(--line);background:#fff;border-radius:4px}
+input{font:inherit;width:100%;padding:10px;border:1.5px solid var(--line);border-radius:6px;margin:6px 0}
+.trackbox{display:flex;gap:10px;max-width:520px}
+.trackbox input{margin:0}
+.steps{display:flex;margin:24px 0 8px;max-width:640px}
+.steps div{flex:1;border-top:4px solid var(--line);padding-top:8px;color:var(--mute);font-size:14px}
+.steps div.done{border-color:var(--cobalt);color:var(--ink);font-weight:600}
+footer{padding:30px 5vw 90px;color:var(--mute);font-size:14px;border-top:1px solid var(--line)}
+.fab{position:fixed;right:20px;bottom:20px;z-index:6;background:var(--cobalt);color:#fff;border:0;border-radius:99px;padding:14px 20px;font-weight:600;box-shadow:0 6px 18px rgba(45,75,255,.35)}
+.chat{position:fixed;right:20px;bottom:20px;z-index:9;width:min(400px,calc(100% - 24px));height:min(600px,calc(100% - 40px));background:#fff;border-radius:12px;border:1px solid var(--line);box-shadow:0 12px 36px rgba(16,24,40,.25);display:none;flex-direction:column;overflow:hidden}
+.chat.open{display:flex}
+.chat header{position:static;padding:10px 14px;background:var(--ink);color:#fff;border:0}
+.chat header button{background:none;border:0;color:#fff;font-size:20px}
+.chat iframe{flex:1;border:0;width:100%}
+@media(max-width:760px){.hero{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){aside.drawer{transition:none}html{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+<header>
+  <span class="logo">UrbanWear</span>
+  <a href="#shop">Shop</a>
+  <a href="#track">Track order</a>
+  <button class="cartbtn" id="openCart">Cart (<span id="count">0</span>)</button>
+</header>
+
+<div class="hero">
+  <div>
+    <h1>Clothes made for the daily commute.</h1>
+    <p>Tees, hoodies and joggers that survive the bus, the office and the weekend. Free returns within 7 days.</p>
+    <a class="btn" href="#shop">Shop the collection</a>
+    <a class="btn alt" href="#track">Track an order</a>
+  </div>
+  <ul class="perks">
+    <li>Delivery in 2-4 days<span>Dhaka same-day on orders before noon</span></li>
+    <li>7-day easy returns<span>Unworn items, tags attached</span></li>
+    <li>Size guide on every item<span>Or ask our assistant</span></li>
+  </ul>
+</div>
+
+<section id="shop">
+  <h2>Shop</h2>
+  <div class="chips" id="chips"></div>
+  <div class="grid" id="grid"></div>
+</section>
+
+<section id="track">
+  <h2>Track your order</h2>
+  <form class="trackbox" id="trackForm">
+    <input id="orderNo" placeholder="Order number, e.g. UW-1001" aria-label="Order number" required>
+    <button class="btn">Track</button>
+  </form>
+  <div id="trackResult"></div>
+</section>
+
+<footer>
+  UrbanWear is a demo store. Products and orders are fictional. Try the assistant: ask about returns, shipping, sizes or order status.
+</footer>
+
+<dialog id="pdlg"><div class="dbody" id="pbody"></div></dialog>
+
+<aside class="drawer" id="drawer" aria-label="Cart">
+  <div class="row" style="border:0"><h2 style="font-size:26px">Your cart</h2><button class="qty" id="closeCart" aria-label="Close cart" style="border:0;background:none;font-size:22px">&times;</button></div>
+  <div id="cartBody"></div>
+</aside>
+
+<button class="fab" id="fab">Ask our assistant</button>
+<div class="chat" id="chat" role="dialog" aria-label="Store assistant">
+  <header><strong>UrbanWear assistant</strong><button id="chatClose" aria-label="Close assistant">&times;</button></header>
+  <iframe id="chatFrame" title="Store assistant"></iframe>
+</div>
+
+<script>
+// ---- Settings ----
+const CUR = "৳";
+const API = "";        // same server as the bot. If this page is hosted elsewhere, put the bot server URL here
+const BOT_URL = "/";   // the chat page of the bot
+
+const STAGES = ["Placed","Packed","Shipped","Delivered"];
+const STAGE_NOTES = ["Order received. We will confirm by phone shortly.","Packed and waiting for courier pickup.","Shipped with courier. Expected in 1-2 days.","Delivered. Thank you for shopping with us."];
+const COLORS = ["#2D4BFF","#1B6B5A","#3B3F4E","#8A3B3B","#4B5563","#6B5B3A","#B7791F","#0F766E"];
+
+let PRODUCTS = [], cart = [], cat = "All", pick = null, sel = null;
+const $ = id => document.getElementById(id);
+const money = n => CUR + n.toLocaleString("en-US");
+const colorOf = p => COLORS[(p.id - 1) % COLORS.length];
+const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+async function api(path, opts) {
+  const r = await fetch(API + path, opts);
+  let d = null;
+  try { d = await r.json(); } catch (e) {}
+  if (!r.ok) throw new Error(d && typeof d.detail === "string" ? d.detail : "Something went wrong. Please try again.");
+  return d;
+}
+
+async function loadProducts() {
+  try {
+    PRODUCTS = (await api("/api/products")).products;
+    drawGrid(); drawCart();
+  } catch (e) {
+    $("grid").innerHTML = '<p class="note">Could not load products. Please refresh the page.</p>';
+  }
+}
+
+function drawGrid() {
+  const cats = ["All", ...new Set(PRODUCTS.map(p => p.cat))];
+  $("chips").innerHTML = cats.map(c => `<button class="chip" aria-pressed="${c === cat}" data-c="${esc(c)}">${esc(c)}</button>`).join("");
+  $("grid").innerHTML = PRODUCTS.filter(p => cat === "All" || p.cat === cat).map(p =>
+    `<button class="card" data-id="${p.id}"><div class="sw" style="background:${colorOf(p)}">${esc(p.name.split(" ")[0])}</div>
+     <div class="info"><h3>${esc(p.name)}</h3><div class="price">${money(p.price)}${p.stock < 1 ? " - Sold out" : p.stock <= 5 ? " - Only " + p.stock + " left" : ""}</div></div></button>`).join("");
+}
+$("chips").onclick = e => { const c = e.target.closest("[data-c]"); if (c) { cat = c.dataset.c; drawGrid(); } };
+$("grid").onclick = e => { const c = e.target.closest("[data-id]"); if (c) openProduct(+c.dataset.id); };
+
+function openProduct(id) {
+  pick = PRODUCTS.find(p => p.id === id); sel = pick.sizes[0];
+  $("pbody").innerHTML = `<div class="sw" style="background:${colorOf(pick)}">${esc(pick.name)}</div>
+    <h2 style="font-size:28px">${esc(pick.name)}</h2><div class="price">${money(pick.price)}</div>
+    <div class="sizes" id="sizes">${pick.sizes.map(s => `<button class="size" aria-pressed="${s === sel}" data-s="${esc(s)}">${esc(s)}</button>`).join("")}</div>
+    <button class="btn" id="addBtn" ${pick.stock < 1 ? "disabled" : ""}>${pick.stock < 1 ? "Sold out" : "Add to cart"}</button> <button class="btn alt" id="pclose">Close</button>
+    <p class="note" id="sn">Not sure about your size? Ask the assistant for the size guide.</p>`;
+  $("pdlg").showModal();
+}
+$("pbody").onclick = e => {
+  const s = e.target.closest("[data-s]");
+  if (s) { sel = s.dataset.s; [...$("sizes").children].forEach(b => b.setAttribute("aria-pressed", b.dataset.s === sel)); }
+  if (e.target.id === "pclose") $("pdlg").close();
+  if (e.target.id === "addBtn") {
+    const inCart = cart.filter(i => i.id === pick.id).reduce((a, i) => a + i.qty, 0);
+    if (inCart >= pick.stock) { $("sn").textContent = "Only " + pick.stock + " in stock, and all are already in your cart."; return; }
+    const f = cart.find(i => i.id === pick.id && i.size === sel);
+    f ? f.qty++ : cart.push({ id: pick.id, size: sel, qty: 1 });
+    $("pdlg").close(); drawCart(); $("drawer").classList.add("open");
+  }
+};
+
+function drawCart() {
+  $("count").textContent = cart.reduce((a, i) => a + i.qty, 0);
+  if (!cart.length) { $("cartBody").innerHTML = '<p class="note">Your cart is empty. Pick something from the shop.</p>'; return; }
+  const total = cart.reduce((a, i) => a + i.qty * (PRODUCTS.find(p => p.id === i.id) || { price: 0 }).price, 0);
+  $("cartBody").innerHTML = cart.map((i, n) => {
+    const p = PRODUCTS.find(x => x.id === i.id) || { name: "Item", price: 0 };
+    return `<div class="row"><div><strong>${esc(p.name)}</strong><div class="note" style="margin:0">Size ${esc(i.size)} &middot; ${money(p.price)}</div></div>
+    <div class="qty"><button data-n="${n}" data-d="-1" aria-label="Less">-</button> ${i.qty} <button data-n="${n}" data-d="1" aria-label="More">+</button></div></div>`;
+  }).join("")
+  + `<div class="row"><strong>Total</strong><strong>${money(total)}</strong></div>
+  <form id="co"><input name="name" placeholder="Full name" required maxlength="100"><input name="phone" placeholder="Phone number" required maxlength="20"><input name="addr" placeholder="Delivery address" required maxlength="300">
+  <p class="note" id="coErr" style="color:#B42318"></p>
+  <button class="btn" style="width:100%;margin-top:8px">Place order (cash on delivery)</button></form>`;
+}
+$("cartBody").onclick = e => {
+  const b = e.target.closest("[data-n]"); if (!b) return;
+  const i = cart[+b.dataset.n], p = PRODUCTS.find(x => x.id === i.id);
+  const d = +b.dataset.d;
+  if (d > 0 && p && cart.filter(c => c.id === i.id).reduce((a, c) => a + c.qty, 0) >= p.stock) return;
+  i.qty += d;
+  if (i.qty < 1) cart.splice(+b.dataset.n, 1);
+  drawCart();
+};
+$("cartBody").onsubmit = async e => {
+  e.preventDefault();
+  const f = new FormData(e.target), btn = e.target.querySelector("button");
+  btn.disabled = true; btn.textContent = "Placing order...";
+  try {
+    const r = await api("/api/orders", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: f.get("name"), phone: f.get("phone"), addr: f.get("addr"),
+        items: cart.map(i => ({ product_id: i.id, size: i.size, qty: i.qty })) })
+    });
+    cart = []; drawCart();
+    $("cartBody").innerHTML = `<h3 style="font-size:24px;margin-top:16px">Order placed</h3>
+      <p style="margin:8px 0">Your order number is <strong>${esc(r.order_id)}</strong>.</p>
+      <p class="note">Track it in the Track order section, or ask the assistant: "Where is order ${esc(r.order_id)}?"</p>`;
+    loadProducts();
+  } catch (err) {
+    btn.disabled = false; btn.textContent = "Place order (cash on delivery)";
+    $("coErr").textContent = err.message;
+    loadProducts();
+  }
+};
+$("openCart").onclick = () => $("drawer").classList.add("open");
+$("closeCart").onclick = () => $("drawer").classList.remove("open");
+
+$("trackForm").onsubmit = async e => {
+  e.preventDefault();
+  const id = $("orderNo").value.trim().toUpperCase();
+  $("trackResult").innerHTML = '<p class="note">Checking...</p>';
+  try {
+    const o = await api("/api/orders/" + encodeURIComponent(id));
+    $("trackResult").innerHTML = `<div class="steps">${STAGES.map((s, i) => `<div class="${i <= o.stage ? "done" : ""}">${s}</div>`).join("")}</div>
+      <p>${STAGE_NOTES[o.stage]}</p>
+      <p class="note">${o.items.map(i => esc(i.name) + " (" + esc(i.size) + ") x" + i.qty).join(", ")}</p>`;
+  } catch (err) {
+    $("trackResult").innerHTML = `<p class="note">No order found for "${esc(id)}". Check the number and try again.</p>`;
+  }
+};
+
+// Chat widget: loads the bot only when opened
+const chat = $("chat");
+$("fab").onclick = () => { if (!$("chatFrame").getAttribute("src")) $("chatFrame").src = BOT_URL; chat.classList.add("open"); $("fab").style.display = "none"; };
+$("chatClose").onclick = () => { chat.classList.remove("open"); $("fab").style.display = ""; };
+
+$("grid").innerHTML = '<p class="note">Loading products... the server can take up to a minute to wake up.</p>';
+drawCart();
+loadProducts();
+</script>
+</body>
+</html>

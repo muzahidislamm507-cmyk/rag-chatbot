@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UrbanWear Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--paper:#EEF1F4;--ink:#101828;--mute:#5B6678;--line:#D5DBE3;--cobalt:#2D4BFF;--warn:#B42318;--warnbg:#FEF0EE}
+*{box-sizing:border-box;margin:0}
+body{font:15px/1.5 "IBM Plex Sans",system-ui,sans-serif;background:var(--paper);color:var(--ink)}
+h1,h2,.logo{font-family:Archivo,Impact,sans-serif;font-stretch:80%}
+:focus-visible{outline:3px solid var(--cobalt);outline-offset:2px}
+header{display:flex;align-items:center;gap:20px;padding:14px 4vw;background:#fff;border-bottom:1px solid var(--line)}
+.logo{font-size:24px;font-weight:900;margin-right:auto}
+header a{color:var(--ink);font-weight:500}
+main{padding:24px 4vw 60px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:28px}
+.stat{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.stat b{display:block;font:800 30px Archivo,sans-serif;font-stretch:75%}
+.stat span{color:var(--mute)}
+.stat.warn{background:var(--warnbg);border-color:#F4C7C1}
+h2{font-size:26px;font-weight:800;margin:6px 0 12px}
+.wrap{overflow-x:auto;background:#fff;border:1px solid var(--line);border-radius:10px;margin-bottom:30px}
+table{width:100%;border-collapse:collapse;min-width:720px}
+th,td{padding:10px 14px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--mute);font-weight:500;font-size:13px}
+tr:last-child td{border-bottom:0}
+select,input{font:inherit;padding:6px 8px;border:1.5px solid var(--line);border-radius:6px;background:#fff}
+input[type=number]{width:96px}
+.low td{background:var(--warnbg)}
+.tag{color:var(--warn);font-weight:600;margin-left:6px}
+.sub{color:var(--mute);font-size:13px}
+.empty{padding:20px;color:var(--mute)}
+[hidden]{display:none!important}
+.lock{background:#fff;border:1px solid var(--line);border-radius:10px;padding:18px;max-width:460px;margin-bottom:24px}
+.lock input{width:100%;margin:8px 0}
+.btn{background:var(--cobalt);color:#fff;border:0;border-radius:6px;padding:9px 18px;font:inherit;font-weight:600;cursor:pointer}
+.err{color:var(--warn);margin-top:8px}
+</style>
+</head>
+<body>
+<header>
+  <span class="logo">UrbanWear Admin</span>
+  <a href="store.html">View store</a>
+</header>
+<main>
+  <div class="lock" id="lock"><strong>Admin key</strong><div class="sub">Enter the ADMIN_KEY set on your server.</div>
+    <input type="password" id="key" aria-label="Admin key" autocomplete="current-password"><button class="btn" id="unlock">Unlock</button><div class="err" id="err"></div></div>
+  <div id="app" hidden>
+  <div class="stats" id="stats"></div>
+
+  <h2>Orders</h2>
+  <div class="wrap"><table>
+    <thead><tr><th>Order</th><th>Customer</th><th>Items</th><th>Total</th><th>Status</th></tr></thead>
+    <tbody id="orders"></tbody>
+  </table></div>
+
+  <h2>Products and stock</h2>
+  <div class="wrap"><table>
+    <thead><tr><th>Product</th><th>Price</th><th>In stock</th></tr></thead>
+    <tbody id="products"></tbody>
+  </table></div>
+  </div>
+</main>
+
+<script>
+const CUR = "৳";
+const API = "";   // same server as the bot
+const STAGES = ["Placed","Packed","Shipped","Delivered"];
+const LOW = 5;
+
+const $ = id => document.getElementById(id);
+const money = n => CUR + (n || 0).toLocaleString("en-US");
+const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+let KEY = "";
+try { KEY = sessionStorage.getItem("uw_key") || ""; } catch (e) {}
+let orders = [], products = [];
+
+async function call(path, opts = {}) {
+  const r = await fetch(API + path, { ...opts, headers: { "Content-Type": "application/json", "X-Admin-Key": KEY } });
+  let d = null;
+  try { d = await r.json(); } catch (e) {}
+  if (r.status === 401) throw new Error("auth");
+  if (!r.ok) throw new Error(d && typeof d.detail === "string" ? d.detail : "Server error. Try again.");
+  return d;
+}
+
+async function load() {
+  try {
+    const [o, p] = await Promise.all([call("/api/admin/orders"), call("/api/products")]);
+    orders = o.orders; products = p.products;
+    $("lock").hidden = true; $("app").hidden = false;
+    render();
+  } catch (e) {
+    $("app").hidden = true; $("lock").hidden = false;
+    $("err").textContent = e.message === "auth" ? "Wrong admin key." : e.message;
+  }
+}
+
+function render() {
+  const open = orders.filter(o => o.stage < 3).length;
+  const sales = orders.reduce((a, o) => a + (o.total || 0), 0);
+  const low = products.filter(p => p.stock <= LOW).length;
+  $("stats").innerHTML =
+    `<div class="stat"><b>${orders.length}</b><span>Total orders</span></div>
+     <div class="stat"><b>${open}</b><span>Not delivered yet</span></div>
+     <div class="stat"><b>${money(sales)}</b><span>Total sales</span></div>
+     <div class="stat ${low ? "warn" : ""}"><b>${low}</b><span>Products low on stock</span></div>`;
+
+  $("orders").innerHTML = orders.map(o => {
+    const items = (o.items || []).map(i => `${esc(i.name)} (${esc(i.size)}) x${i.qty}`).join("<br>");
+    return `<tr><td><strong>${esc(o.order_id)}</strong><div class="sub">${esc(o.date)}</div></td>
+      <td>${esc(o.name)}<div class="sub">${esc(o.phone)}<br>${esc(o.addr)}</div></td>
+      <td>${items}</td><td>${money(o.total)}</td>
+      <td><select data-o="${esc(o.order_id)}" aria-label="Status of ${esc(o.order_id)}">${STAGES.map((s, i) => `<option value="${i}" ${i === o.stage ? "selected" : ""}>${s}</option>`).join("")}</select></td></tr>`;
+  }).join("");
+
+  $("products").innerHTML = products.map(p =>
+    `<tr class="${p.stock <= LOW ? "low" : ""}"><td>${esc(p.name)}${p.stock < 1 ? '<span class="tag">Sold out</span>' : p.stock <= LOW ? '<span class="tag">Low stock</span>' : ""}</td>
+     <td><input type="number" min="0" value="${p.price}" data-p="${p.id}" data-f="price" aria-label="Price of ${esc(p.name)}"></td>
+     <td><input type="number" min="0" value="${p.stock}" data-p="${p.id}" data-f="stock" aria-label="Stock of ${esc(p.name)}"></td></tr>`).join("");
+}
+
+$("unlock").onclick = () => {
+  KEY = $("key").value.trim();
+  try { sessionStorage.setItem("uw_key", KEY); } catch (e) {}
+  $("err").textContent = "";
+  load();
+};
+$("key").onkeydown = e => { if (e.key === "Enter") $("unlock").click(); };
+
+$("orders").onchange = async e => {
+  const id = e.target.dataset.o; if (!id) return;
+  try { await call("/api/admin/orders/" + encodeURIComponent(id), { method: "PATCH", body: JSON.stringify({ stage: +e.target.value }) }); }
+  catch (err) { alert(err.message); }
+  load();
+};
+$("products").onchange = async e => {
+  const id = e.target.dataset.p; if (!id) return;
+  const body = {}; body[e.target.dataset.f] = Math.max(0, Math.floor(+e.target.value || 0));
+  try { await call("/api/admin/products/" + id, { method: "PATCH", body: JSON.stringify(body) }); }
+  catch (err) { alert(err.message); }
+  load();
+};
+
+// refresh every 20 seconds, but not while you are typing in a box
+setInterval(() => { if (!$("app").hidden && !(document.activeElement && document.activeElement.tagName === "INPUT")) load(); }, 20000);
+if (KEY) load();
+</script>
+</body>
+</html>
