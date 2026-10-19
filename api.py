@@ -96,6 +96,11 @@ def serve_ui():
     return FileResponse("static/index.html")
 
 
+@app.get("/report")
+def serve_report():
+    return FileResponse("static/report.html")
+
+
 @app.get("/health")
 def health():
     return {"status": "ok", "chunks_loaded": len(CHUNKS) if CHUNKS else 0, "active_sessions": len(SESSIONS)}
@@ -125,6 +130,8 @@ def ask(req: AskRequest, request: Request):
     try:
         result = answer_query(query, INDEX, CHUNKS, session=SESSIONS[session_id])
         result["session_id"] = session_id
+        if result.get("not_found"):
+            _log_unanswered(query)
         return result
     except Exception as e:
         logger.exception(f"/ask এন্ডপয়েন্টে সমস্যা: {e}")
@@ -161,6 +168,8 @@ def ask_stream(req: AskRequest, request: Request):
         try:
             for event in stream_answer_query(query, INDEX, CHUNKS, session=SESSIONS[session_id]):
                 yield json.dumps(event, ensure_ascii=False) + "\n"
+                if event.get("type") == "done" and event.get("not_found"):
+                    _log_unanswered(query)
         except Exception as e:
             logger.exception(f"/ask/stream এন্ডপয়েন্টে সমস্যা: {e}")
             yield json.dumps({"type": "error", "text": "সার্ভারে একটা সমস্যা হয়েছে।"}, ensure_ascii=False) + "\n"
@@ -343,3 +352,148 @@ def _remove_quietly(path: str):
         os.remove(path)
     except OSError:
         pass
+
+
+# ---------------------------------------------------------
+# #Handoff: বট উত্তর দিতে না পারলে কাস্টমার ফোন নম্বর রেখে যায়, দোকানের লোক পরে যোগাযোগ করে।
+# ডেটা handoffs.json ফাইলে জমা হয় (DATA_DIR env দিলে সেই ফোল্ডারে)।
+# ---------------------------------------------------------
+HANDOFF_FILE = os.path.join(os.getenv("DATA_DIR", "."), "handoffs.json")
+_handoff_lock = threading.Lock()
+_PHONE_OK = re.compile(r"^[0-9+\-\s()]{6,20}$")
+
+
+class HandoffRequest(BaseModel):
+    question: str = Field(..., min_length=1, max_length=1000)
+    phone: str = Field(..., min_length=6, max_length=20)
+
+
+def _read_handoffs() -> list:
+    if not os.path.exists(HANDOFF_FILE):
+        return []
+    try:
+        with open(HANDOFF_FILE, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        logger.exception("handoffs.json পড়তে সমস্যা, খালি তালিকা ধরা হলো")
+        return []
+
+
+@app.post("/handoff")
+def create_handoff(req: HandoffRequest, request: Request):
+    client_ip = request.client.host if request.client else "unknown"
+    check_rate_limit(client_ip)
+
+    # বাংলা সংখ্যা (০১৭১...) লিখলেও চলবে: ইংরেজি সংখ্যায় বদলে নেওয়া হয়
+    phone = req.phone.strip().translate(str.maketrans("০১২৩৪৫৬৭৮৯", "0123456789"))
+    if not _PHONE_OK.match(phone) or sum(ch.isdigit() for ch in phone) < 6:
+        raise HTTPException(status_code=400, detail="ফোন নম্বরটা ঠিক মনে হচ্ছে না, আরেকবার দেখে লিখুন।")
+
+    with _handoff_lock:
+        items = _read_handoffs()
+        items.append({
+            "id": len(items) + 1,
+            "question": sanitize_query(req.question),
+            "phone": phone,
+            "time": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "done": False,
+        })
+        tmp = HANDOFF_FILE + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(items, f, ensure_ascii=False, indent=1)
+        os.replace(tmp, HANDOFF_FILE)  # মাঝপথে বন্ধ হলেও ফাইল নষ্ট হয় না
+    logger.info(f"📞 নতুন handoff অনুরোধ (#{len(items)})")
+    return {"status": "saved"}
+
+
+@app.get("/admin/handoffs", dependencies=[Depends(require_admin)])
+def list_handoffs():
+    with _handoff_lock:
+        items = _read_handoffs()
+    return {"handoffs": list(reversed(items))}
+
+
+# ---------------------------------------------------------
+# #Report: দোকানদারের রিপোর্ট পেজের জন্য
+#   - ফোন অনুরোধে "যোগাযোগ হয়েছে" চিহ্ন দেওয়া
+#   - বট যে প্রশ্নের উত্তর দিতে পারেনি তার খাতা (unanswered.json) — ফোন নম্বর ছাড়াই
+# ---------------------------------------------------------
+UNANSWERED_FILE = os.path.join(os.getenv("DATA_DIR", "."), "unanswered.json")
+MAX_UNANSWERED = 500          # ফাইল যেন অসীম বড় না হয়, তাই পুরনোগুলো বাদ পড়ে
+_unanswered_lock = threading.Lock()
+
+
+class HandoffPatch(BaseModel):
+    done: bool
+
+
+def _write_json_atomic(path: str, data):
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=1)
+    os.replace(tmp, path)
+
+
+def _read_unanswered() -> list:
+    if not os.path.exists(UNANSWERED_FILE):
+        return []
+    try:
+        with open(UNANSWERED_FILE, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        logger.exception("unanswered.json পড়তে সমস্যা, খালি তালিকা ধরা হলো")
+        return []
+
+
+def _log_unanswered(question: str):
+    """একই প্রশ্ন আবার এলে নতুন সারি না বানিয়ে গুনতি বাড়ায়। এখানে ব্যর্থ হলে চ্যাট যেন না থামে।"""
+    try:
+        q = sanitize_query(question)
+        key = " ".join(q.lower().split())
+        if not key:
+            return
+        now = time.strftime("%Y-%m-%d %H:%M:%S")
+        with _unanswered_lock:
+            items = _read_unanswered()
+            hit = next((it for it in items if " ".join(it["question"].lower().split()) == key), None)
+            if hit:
+                hit["count"] += 1
+                hit["last"] = now
+            else:
+                next_id = max([it["id"] for it in items] + [0]) + 1
+                items.append({"id": next_id, "question": q, "count": 1, "first": now, "last": now})
+                items = items[-MAX_UNANSWERED:]
+            _write_json_atomic(UNANSWERED_FILE, items)
+    except Exception:
+        logger.exception("unanswered খাতায় লিখতে সমস্যা (চ্যাট চলছে)")
+
+
+@app.patch("/admin/handoffs/{handoff_id}", dependencies=[Depends(require_admin)])
+def update_handoff(handoff_id: int, req: HandoffPatch):
+    with _handoff_lock:
+        items = _read_handoffs()
+        item = next((x for x in items if x.get("id") == handoff_id), None)
+        if not item:
+            raise HTTPException(status_code=404, detail="এই অনুরোধটা খুঁজে পাওয়া যায়নি।")
+        item["done"] = req.done
+        _write_json_atomic(HANDOFF_FILE, items)
+    return item
+
+
+@app.get("/admin/unanswered", dependencies=[Depends(require_admin)])
+def list_unanswered():
+    with _unanswered_lock:
+        items = _read_unanswered()
+    items.sort(key=lambda x: (x["count"], x["last"]), reverse=True)
+    return {"unanswered": items}
+
+
+@app.delete("/admin/unanswered/{item_id}", dependencies=[Depends(require_admin)])
+def delete_unanswered(item_id: int):
+    with _unanswered_lock:
+        items = _read_unanswered()
+        left = [x for x in items if x.get("id") != item_id]
+        if len(left) == len(items):
+            raise HTTPException(status_code=404, detail="এই প্রশ্নটা খুঁজে পাওয়া যায়নি।")
+        _write_json_atomic(UNANSWERED_FILE, left)
+    return {"deleted": item_id}
