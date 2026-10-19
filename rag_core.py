@@ -556,6 +556,8 @@ def _run_with_retry(call_fn, max_retries: int = 3, base_delay: int = 5) -> dict:
             time.sleep(wait)
         except genai_errors.APIError as e:
             logger.error(f"API এরর: {e}")
+            if getattr(e, "code", None) == 429:  # কোটা/রেট লিমিট শেষ
+                return {"answer": "এই মুহূর্তে অনেক প্রশ্ন আসছে, তাই উত্তর দেওয়া যাচ্ছে না। এক মিনিট পর আবার চেষ্টা করুন।", "_ok": False}
             return {"answer": "একটা এরর হয়েছে, দয়া করে আপনার মডেল নাম বা API কী চেক করুন।", "_ok": False}
         except Exception as e:
             logger.exception(f"অপ্রত্যাশিত এরর: {e}")
@@ -607,6 +609,23 @@ def generate_answer_with_chat(session: RagSession, query: str, relevant_chunks: 
     return {"answer": result["answer"], "sources": sources if result["_ok"] else []}
 
 
+# ---------------------------------------------------------
+# #Handoff: উত্তর পাওয়া যায়নি কিনা বোঝা (না পেলে UI ফোন নম্বর চাইবে)
+# ---------------------------------------------------------
+_NOT_FOUND_HINTS = [
+    "পাওয়াযায়নি", "পাওয়াযায়না", "খুঁজেপাইনি", "জানিনা",
+    "notfoundin", "couldnotfind", "couldn'tfind", "idontknow", "donothaveinformation",
+]
+
+
+def looks_unanswered(text: str) -> bool:
+    """উত্তরে 'পাওয়া যায়নি' জাতীয় কথা থাকলে True। স্পেস/অদৃশ্য অক্ষর বাদ দিয়ে মেলানো হয়।"""
+    import unicodedata
+    t = unicodedata.normalize("NFC", text or "").lower()
+    t = re.sub(r"[\s\u00a0\u200b-\u200f\u2060\ufeff]+", "", t)
+    return any(h in t for h in _NOT_FOUND_HINTS)
+
+
 def stream_answer_query(query: str, index, chunks: list[Chunk], session: RagSession = None, top_k: int = TOP_K):
     """
     #Streaming Answer: উত্তর একবারে না দিয়ে টুকরো টুকরো (token/chunk) করে yield করে,
@@ -629,7 +648,7 @@ def stream_answer_query(query: str, index, chunks: list[Chunk], session: RagSess
 
     relevant = retrieve_relevant_chunks(retrieval_query, index, chunks, top_k=top_k)
     if not relevant:
-        yield {"type": "done", "sources": [], "retrieved": []}
+        yield {"type": "done", "sources": [], "retrieved": [], "not_found": True}
         return
 
     numbered_context = "\n\n".join(
@@ -649,6 +668,7 @@ def stream_answer_query(query: str, index, chunks: list[Chunk], session: RagSess
         )
 
     max_retries, base_delay = 3, 5
+    full_text = ""  # #Handoff: পুরো উত্তর জমিয়ে শেষে চেক করা হবে
     for attempt in range(1, max_retries + 1):
         got_any_chunk = False
         last_part = None
@@ -657,6 +677,7 @@ def stream_answer_query(query: str, index, chunks: list[Chunk], session: RagSess
                 last_part = part
                 if getattr(part, "text", None):
                     got_any_chunk = True
+                    full_text += part.text
                     yield {"type": "chunk", "text": part.text}
             if last_part is not None:
                 _warn_if_truncated(last_part)
@@ -675,6 +696,13 @@ def stream_answer_query(query: str, index, chunks: list[Chunk], session: RagSess
             wait = base_delay * attempt
             logger.warning(f"স্ট্রিম শুরুর আগে সার্ভার ব্যস্ত (503), {wait} সেকেন্ড পর আবার চেষ্টা করা হচ্ছে... (attempt {attempt}/{max_retries})")
             time.sleep(wait)
+        except genai_errors.APIError as e:
+            logger.error(f"API এরর (streaming): {e}")
+            if getattr(e, "code", None) == 429:  # কোটা/রেট লিমিট শেষ
+                yield {"type": "error", "text": "এই মুহূর্তে অনেক প্রশ্ন আসছে, তাই উত্তর দেওয়া যাচ্ছে না। এক মিনিট পর আবার চেষ্টা করুন।"}
+            else:
+                yield {"type": "error", "text": "দুঃখিত, একটা সমস্যা হয়েছে। একটু পর আবার চেষ্টা করুন।"}
+            return
         except Exception as e:
             logger.exception(f"স্ট্রিমিং-এ অপ্রত্যাশিত এরর: {e}")
             yield {"type": "error", "text": "দুঃখিত, একটা সমস্যা হয়েছে। rag_pipeline.log ফাইলে বিস্তারিত দেখুন।"}
@@ -684,6 +712,7 @@ def stream_answer_query(query: str, index, chunks: list[Chunk], session: RagSess
         "type": "done",
         "sources": sources,
         "retrieved": [{"text": c.text[:200], "source": c.source} for c in relevant],
+        "not_found": looks_unanswered(full_text),
     }
 
 
@@ -701,7 +730,7 @@ def answer_query(query: str, index, chunks: list[Chunk], session: RagSession = N
 
     relevant = retrieve_relevant_chunks(retrieval_query, index, chunks, top_k=top_k)
     if not relevant:
-        return {"answer": "কোনো প্রাসঙ্গিক তথ্য খুঁজে পাওয়া যায়নি।", "sources": [], "retrieved": []}
+        return {"answer": "কোনো প্রাসঙ্গিক তথ্য খুঁজে পাওয়া যায়নি।", "sources": [], "retrieved": [], "not_found": True}
 
     if session:
         result = generate_answer_with_chat(session, query, relevant)
@@ -710,6 +739,7 @@ def answer_query(query: str, index, chunks: list[Chunk], session: RagSession = N
         result = generate_answer(query, relevant)
 
     result["retrieved"] = [{"text": c.text[:200], "source": c.source} for c in relevant]
+    result["not_found"] = looks_unanswered(result.get("answer", ""))
     return result
 
 
