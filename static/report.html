@@ -157,6 +157,7 @@
         </div>
       </div>
       <div class="topActions" id="topActions" hidden>
+        <a class="ghost" href="/static/admin.html">অর্ডার ও স্টক</a>
         <a class="ghost" href="/">চ্যাট দেখুন</a>
         <button class="ghost" id="logoutBtn" type="button">বের হন</button>
       </div>
@@ -198,9 +199,9 @@ const $ = (id) => document.getElementById(id);
 let tab = 'handoff';              // এখন কোন ট্যাব খোলা
 let handoffs = [], unanswered = [];
 
-function getKey() { return sessionStorage.getItem('adminKey') || ''; }
-function setKey(k) { sessionStorage.setItem('adminKey', k); }
-function clearKey() { sessionStorage.removeItem('adminKey'); }
+function getKey() { return sessionStorage.getItem('adminKey') || sessionStorage.getItem('uw_key') || ''; }
+function setKey(k) { sessionStorage.setItem('adminKey', k); sessionStorage.setItem('uw_key', k); }
+function clearKey() { sessionStorage.removeItem('adminKey'); sessionStorage.removeItem('uw_key'); }
 
 // সব রিকোয়েস্ট এখান দিয়ে যায়; ভুল key হলে (401) লগইনে ফেরত পাঠায়
 async function api(path, options = {}) {
