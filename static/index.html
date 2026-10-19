@@ -2,72 +2,207 @@
 <html lang="bn">
 <head>
 <meta charset="UTF-8">
-<title>RAG চ্যাট</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>সহায়তা চ্যাট</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;500;700&family=Noto+Sans:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&display=swap" rel="stylesheet">
 <!-- Markdown রেন্ডার (**বোল্ড**, লিস্ট ইত্যাদি) + DOMPurify দিয়ে XSS-নিরাপদ করা -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
 <style>
-  body { font-family: 'Noto Sans Bengali', 'Noto Sans', sans-serif; max-width: 700px; margin: 40px auto; background:#f5f5f7; }
-  h2 { text-align: center; }
-  #chat { background: white; border-radius: 10px; padding: 16px; height: 420px; overflow-y: auto; box-shadow: 0 1px 4px rgba(0,0,0,.1); }
-  .msg { margin: 10px 0; line-height: 1.5; }
-  .user { text-align: right; color: #1a73e8; }
-  .bot { text-align: left; color: #222; }
+  :root {
+    --navy-900: #0A1F44;
+    --navy-800: #0F2A5C;
+    --navy-700: #1A3A78;
+    --blue-500: #2F6FDE;
+    --blue-100: #E3ECFA;
+    --blue-50:  #F3F7FD;
+    --line:     #D6E0EE;
+    --ink:      #0F1E36;
+    --muted:    #5A6A82;
+    --danger:   #B3261E;
+    --white:    #FFFFFF;
+    --disabled: #9AA8C0;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    font-family: 'Hind Siliguri', 'Noto Sans Bengali', system-ui, sans-serif;
+    font-size: 16px; line-height: 1.6; color: var(--ink); background: var(--blue-50);
+  }
+  button, input { font-family: inherit; font-size: inherit; }
+  :focus-visible { outline: 3px solid var(--blue-500); outline-offset: 2px; }
+
+  /* ---------- হেডার ---------- */
+  .topbar { background: var(--navy-900); color: var(--white); }
+  .topbar-inner {
+    max-width: 1120px; margin: 0 auto; padding: 14px 24px;
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  }
+  .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .logo {
+    width: 40px; height: 40px; border-radius: 10px; flex: none;
+    background: var(--white); display: grid; place-items: center;
+  }
+  .logo svg { width: 22px; height: 22px; fill: var(--navy-900); }
+  .brand h1 { margin: 0; font-size: 19px; font-weight: 600; line-height: 1.3; }
+  .brand p { margin: 0; font-size: 13px; color: #B7C6E4; line-height: 1.3; }
+  #resetBtn {
+    background: transparent; color: var(--white); border: 1px solid rgba(255,255,255,.45);
+    border-radius: 8px; padding: 7px 14px; cursor: pointer; font-size: 14px; white-space: nowrap;
+  }
+  #resetBtn:hover { background: rgba(255,255,255,.12); }
+  #resetBtn:focus-visible { outline-color: var(--white); }
+
+  /* ---------- মূল লেআউট ---------- */
+  .layout {
+    max-width: 1120px; margin: 0 auto; padding: 24px;
+    display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 24px; align-items: start;
+  }
+  .card { background: var(--white); border: 1px solid var(--line); border-radius: 12px; }
+
+  /* ---------- চ্যাট ---------- */
+  .chatCard { display: flex; flex-direction: column; height: calc(100dvh - 140px); min-height: 460px; overflow: hidden; }
+  #chat {
+    flex: 1; overflow-y: auto; padding: 22px; display: flex; flex-direction: column; gap: 10px;
+  }
+  #chat:empty::before {
+    content: "আপনার প্রশ্ন লিখুন। আপলোড করা ডকুমেন্ট দেখে আমি উত্তর দেব।";
+    margin: auto; max-width: 320px; text-align: center; color: var(--muted);
+  }
+  .msg { max-width: 82%; padding: 10px 15px; line-height: 1.65; overflow-wrap: anywhere; }
+  .user {
+    align-self: flex-end; background: var(--navy-800); color: var(--white);
+    border-radius: 14px 14px 4px 14px; white-space: pre-wrap;
+  }
+  .bot {
+    align-self: flex-start; background: var(--blue-100); color: var(--ink);
+    border-radius: 14px 14px 14px 4px;
+  }
+  .bot:empty { min-width: 64px; }
+  .bot:empty::before {
+    content: "●●●"; letter-spacing: 3px; font-size: 11px; color: var(--navy-700);
+    animation: pulse 1.2s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
   .bot p { margin: 6px 0; }
   .bot ul, .bot ol { margin: 6px 0; padding-left: 22px; }
   .bot li { margin: 3px 0; }
   .bot strong { font-weight: 700; }
-  .bot h1, .bot h2, .bot h3, .bot h4 { font-size: 15px; margin: 10px 0 4px; text-align: left; }
-  .bot code { background: #f0f0f2; padding: 1px 5px; border-radius: 4px; font-size: 13px; }
-  .bot table { border-collapse: collapse; margin: 8px 0; font-size: 14px; }
-  .bot th, .bot td { border: 1px solid #ddd; padding: 4px 8px; }
+  .bot h1, .bot h2, .bot h3, .bot h4 { font-size: 16px; font-weight: 600; margin: 10px 0 4px; }
+  .bot code { background: var(--white); padding: 1px 6px; border-radius: 4px; font-size: 14px; }
+  .bot table { border-collapse: collapse; margin: 8px 0; font-size: 14px; background: var(--white); }
+  .bot th, .bot td { border: 1px solid var(--line); padding: 5px 9px; text-align: left; }
+  .bot th { background: var(--blue-50); }
   .bot > :first-child { margin-top: 0; }
   .bot > :last-child { margin-bottom: 0; }
-  .sources { font-size: 12px; color: #888; margin-top: 4px; }
-  #inputRow { display: flex; margin-top: 12px; gap: 8px; }
-  #query { flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #ccc; }
-  button { padding: 10px 18px; border: none; border-radius: 8px; background: #1a73e8; color: white; cursor: pointer; }
-  button:disabled { background: #aaa; }
-  #resetBtn { background: #888; font-size: 12px; padding: 6px 12px; }
-  .topRow { display: flex; justify-content: space-between; align-items: center; }
+  .sources { align-self: flex-start; font-size: 13px; color: var(--muted); margin: -4px 0 4px 4px; }
 
-  #docsPanel { background: white; border-radius: 10px; padding: 14px 16px; margin-top: 14px; box-shadow: 0 1px 4px rgba(0,0,0,.1); }
-  #docsPanel summary { cursor: pointer; font-weight: bold; color: #333; }
-  #docsList { margin: 10px 0; font-size: 14px; }
-  .docItem { display: flex; justify-content: space-between; padding: 4px 0; color: #444; border-bottom: 1px solid #f0f0f0; }
+  /* ফোন নম্বর চাওয়ার বক্স */
+  .handoff {
+    align-self: flex-start; max-width: 82%; background: var(--white);
+    border: 1px solid var(--line); border-left: 4px solid var(--navy-700);
+    border-radius: 8px; padding: 12px 14px; font-size: 15px;
+  }
+  .handoff input {
+    padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; margin: 8px 8px 0 0; width: 190px; max-width: 100%;
+  }
+  .handoff button {
+    padding: 8px 16px; border: none; border-radius: 8px; background: var(--navy-800); color: var(--white); cursor: pointer; margin-top: 8px;
+  }
+  .handoff button:hover { background: var(--navy-700); }
+  .handoff button:disabled { background: var(--disabled); cursor: default; }
+
+  #inputRow { display: flex; gap: 10px; padding: 14px; border-top: 1px solid var(--line); background: var(--white); }
+  #query {
+    flex: 1; min-width: 0; padding: 11px 14px; border: 1px solid var(--line); border-radius: 8px; color: var(--ink);
+  }
+  #query::placeholder { color: #8795AB; }
+  #query:focus { outline: none; border-color: var(--blue-500); box-shadow: 0 0 0 3px rgba(47,111,222,.2); }
+  #sendBtn {
+    padding: 0 24px; border: none; border-radius: 8px; background: var(--navy-800); color: var(--white);
+    font-weight: 500; cursor: pointer;
+  }
+  #sendBtn:hover { background: var(--navy-700); }
+  #sendBtn:disabled { background: var(--disabled); cursor: default; }
+
+  /* ---------- ডকুমেন্ট প্যানেল ---------- */
+  #docsPanel { padding: 18px; }
+  #docsPanel h2 { margin: 0; font-size: 17px; font-weight: 600; color: var(--navy-900); }
+  .hint { margin: 2px 0 12px; font-size: 13px; color: var(--muted); }
+  #docsList { font-size: 15px; color: var(--muted); }
+  .docItem {
+    display: flex; justify-content: space-between; align-items: center; gap: 10px;
+    padding: 10px 0; border-bottom: 1px solid var(--line); color: var(--ink);
+  }
   .docItem:last-child { border-bottom: none; }
-  .docChunks { color: #999; font-size: 12px; }
-  .docRight { display: flex; align-items: center; gap: 10px; }
-  .delBtn { background: none; color: #d93025; font-size: 13px; padding: 2px 8px; border: 1px solid #f1c4c0; }
-  .delBtn:hover { background: #fce8e6; }
-  .delBtn:disabled { background: none; color: #aaa; border-color: #ddd; }
-  #uploadBtn { background: #34a853; font-size: 13px; padding: 8px 14px; margin-top: 8px; }
-  #uploadBtn:disabled { background: #aaa; }
-  #uploadStatus { font-size: 13px; margin-top: 6px; color: #666; }
+  .docItem > span:first-child { min-width: 0; overflow-wrap: anywhere; font-weight: 500; }
+  .docRight { display: flex; align-items: center; gap: 10px; flex: none; }
+  .docChunks { color: var(--muted); font-size: 13px; }
+  .delBtn {
+    background: none; color: var(--danger); font-size: 13px; padding: 3px 10px;
+    border: 1px solid #EBC5C2; border-radius: 6px; cursor: pointer;
+  }
+  .delBtn:hover { background: #FDECEA; }
+  .delBtn:disabled { color: var(--disabled); border-color: var(--line); background: none; cursor: default; }
+  #uploadBtn {
+    width: 100%; margin-top: 14px; padding: 10px 14px; background: var(--white); color: var(--navy-800);
+    border: 1.5px solid var(--navy-800); border-radius: 8px; font-weight: 500; cursor: pointer;
+  }
+  #uploadBtn:hover { background: var(--blue-50); }
+  #uploadBtn:disabled { color: var(--disabled); border-color: var(--disabled); cursor: default; background: var(--white); }
+  #uploadStatus { font-size: 14px; margin-top: 10px; color: var(--muted); overflow-wrap: anywhere; }
+  #uploadStatus:empty { display: none; }
+
+  /* ---------- ছোট স্ক্রিন ---------- */
+  @media (max-width: 860px) {
+    .layout { grid-template-columns: minmax(0, 1fr); padding: 16px; gap: 16px; }
+    .topbar-inner { padding: 12px 16px; }
+    .brand p { display: none; }
+    .chatCard { height: calc(100dvh - 150px); min-height: 420px; }
+    .msg, .handoff { max-width: 92%; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .bot:empty::before { animation: none; opacity: .7; }
+  }
 </style>
 </head>
 <body>
-  <div class="topRow">
-    <h2>📚 RAG চ্যাটবট</h2>
-    <button id="resetBtn" onclick="resetSession()">🔄 নতুন কথোপকথন</button>
-  </div>
-  <div id="chat"></div>
-  <div id="inputRow">
-    <input id="query" type="text" placeholder="প্রশ্ন লিখুন..." />
-    <button id="sendBtn" onclick="sendQuery()">পাঠান</button>
-  </div>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <div class="logo" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M4 3h16a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H9l-5 4v-4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/></svg>
+        </div>
+        <div>
+          <h1>সহায়তা চ্যাট</h1>
+          <p>আমাদের ডকুমেন্ট থেকে সঠিক উত্তর</p>
+        </div>
+      </div>
+      <button id="resetBtn" onclick="resetSession()">নতুন কথোপকথন</button>
+    </div>
+  </header>
 
-  <!-- #Document Management UI: ইনডেক্স হওয়া ডকুমেন্টের তালিকা + নতুন ফাইল আপলোড -->
-  <details id="docsPanel" open>
-    <summary>📁 ইনডেক্স করা ডকুমেন্ট</summary>
-    <div id="docsList">লোড হচ্ছে...</div>
-    <input type="file" id="fileInput" accept=".txt,.pdf" style="display:none" onchange="uploadFile()" />
-    <button id="uploadBtn" onclick="document.getElementById('fileInput').click()">➕ নতুন ডকুমেন্ট আপলোড</button>
-    <div id="uploadStatus"></div>
-  </details>
+  <main class="layout">
+    <section class="card chatCard" aria-label="চ্যাট">
+      <div id="chat" role="log" aria-live="polite"></div>
+      <div id="inputRow">
+        <input id="query" type="text" placeholder="আপনার প্রশ্ন লিখুন..." aria-label="আপনার প্রশ্ন" autocomplete="off" />
+        <button id="sendBtn" onclick="sendQuery()">পাঠান</button>
+      </div>
+    </section>
+
+    <!-- #Document Management UI: ইনডেক্স হওয়া ডকুমেন্টের তালিকা + নতুন ফাইল আপলোড -->
+    <aside class="card" id="docsPanel" aria-label="ডকুমেন্ট">
+      <h2>ইনডেক্স করা ডকুমেন্ট</h2>
+      <p class="hint">আপলোড বা মুছতে Admin key লাগবে।</p>
+      <div id="docsList">লোড হচ্ছে...</div>
+      <input type="file" id="fileInput" accept=".txt,.pdf" style="display:none" onchange="uploadFile()" />
+      <button id="uploadBtn" onclick="document.getElementById('fileInput').click()">নতুন ডকুমেন্ট আপলোড করুন</button>
+      <div id="uploadStatus"></div>
+    </aside>
+  </main>
 
 <script>
 const chat = document.getElementById('chat');
@@ -106,7 +241,7 @@ function addMessage(text, cls, sources) {
   if (sources && sources.length) {
     const s = document.createElement('div');
     s.className = 'sources';
-    s.textContent = '📎 সূত্র: ' + sources.join(', ');
+    s.textContent = 'সূত্র: ' + sources.join(', ');
     chat.appendChild(s);
   }
   chat.scrollTop = chat.scrollHeight;
@@ -160,11 +295,17 @@ async function sendQuery() {
           chat.scrollTop = chat.scrollHeight;
         } else if (event.type === 'error') {
           botDiv.textContent = '❌ ' + event.text;
-        } else if (event.type === 'done' && event.sources && event.sources.length) {
-          const s = document.createElement('div');
-          s.className = 'sources';
-          s.textContent = '📎 সূত্র: ' + event.sources.join(', ');
-          chat.appendChild(s);
+        } else if (event.type === 'done') {
+          if (event.sources && event.sources.length) {
+            const s = document.createElement('div');
+            s.className = 'sources';
+            s.textContent = 'সূত্র: ' + event.sources.join(', ');
+            chat.appendChild(s);
+          }
+          // উত্তর তৈরি হয়নি (ফাঁকা বাবল থেকে গেলে) — লোডিং চিহ্ন যেন আটকে না থাকে
+          if (!fullText && !botDiv.textContent) botDiv.textContent = 'এই প্রশ্নের উত্তর পাওয়া যায়নি।';
+          // #Handoff: উত্তর না পেলে ফোন নম্বর চাওয়া
+          if (event.not_found) showHandoffBox(q);
         }
       }
     }
@@ -173,6 +314,47 @@ async function sendQuery() {
   } finally {
     btn.disabled = false;
   }
+}
+
+// #Handoff: বট উত্তর না দিতে পারলে ফোন নম্বর নেওয়ার ছোট বক্স
+function showHandoffBox(question) {
+  const box = document.createElement('div');
+  box.className = 'handoff';
+  const msg = document.createElement('div');
+  msg.textContent = 'উত্তর পাননি? আপনার ফোন নম্বর দিন, আমাদের একজন আপনাকে জানাবে।';
+  const phone = document.createElement('input');
+  phone.type = 'tel';
+  phone.placeholder = 'ফোন নম্বর';
+  phone.setAttribute('aria-label', 'ফোন নম্বর');
+  phone.maxLength = 20;
+  const send = document.createElement('button');
+  send.textContent = 'পাঠান';
+  const note = document.createElement('div');
+  note.style.marginTop = '6px';
+  send.onclick = async () => {
+    if (!phone.value.trim()) return;
+    send.disabled = true;
+    try {
+      const res = await fetch('/handoff', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: question, phone: phone.value.trim() })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        note.textContent = '❌ ' + (data.detail || 'পাঠানো যায়নি');
+        send.disabled = false;
+        return;
+      }
+      box.textContent = '✅ ধন্যবাদ! আপনার নম্বর রাখা হয়েছে, দোকানের লোক শীঘ্রই যোগাযোগ করবে।';
+    } catch (e) {
+      note.textContent = '❌ সার্ভারে পৌঁছানো যাচ্ছে না।';
+      send.disabled = false;
+    }
+  };
+  box.append(msg, phone, send, note);
+  chat.appendChild(box);
+  chat.scrollTop = chat.scrollHeight;
 }
 
 input.addEventListener('keydown', (e) => { if (e.key === 'Enter') sendQuery(); });
@@ -207,13 +389,13 @@ async function loadDocuments() {
       row.className = 'docItem';
       // textContent ব্যবহার: ফাইলের নাম কখনো HTML হিসেবে চলবে না (XSS প্রতিরোধ)
       const nameEl = document.createElement('span');
-      nameEl.textContent = '📄 ' + doc.name;
+      nameEl.textContent = doc.name;
       const chunksEl = document.createElement('span');
       chunksEl.className = 'docChunks';
-      chunksEl.textContent = doc.chunks + ' চাঙ্ক';
+      chunksEl.textContent = doc.chunks + 'টি অংশ';
       const delEl = document.createElement('button');
       delEl.className = 'delBtn';
-      delEl.textContent = '🗑️ মুছুন';
+      delEl.textContent = 'মুছুন';
       delEl.title = 'এই ডকুমেন্ট ইনডেক্স থেকে মুছে ফেলুন';
       delEl.onclick = () => deleteDocument(doc.name, delEl);
       const rightEl = document.createElement('span');
@@ -244,7 +426,7 @@ async function deleteDocument(name, btnEl) {
       btnEl.disabled = false;
       return;
     }
-    status.textContent = `🗑️ "${data.deleted}" মুছে ফেলা হয়েছে।`;
+    status.textContent = `"${data.deleted}" মুছে ফেলা হয়েছে।`;
     loadDocuments();
   } catch (e) {
     status.textContent = '❌ সার্ভারে পৌঁছানো যাচ্ছে না।';
