@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>দোকানদারের রিপোর্ট</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy-900: #0A1F44;
+    --navy-800: #0F2A5C;
+    --navy-700: #1A3A78;
+    --blue-500: #2F6FDE;
+    --blue-100: #E3ECFA;
+    --blue-50:  #F3F7FD;
+    --line:     #D6E0EE;
+    --ink:      #0F1E36;
+    --muted:    #5A6A82;
+    --danger:   #B3261E;
+    --ok:       #1B6B43;
+    --ok-bg:    #E6F4EC;
+    --white:    #FFFFFF;
+    --disabled: #9AA8C0;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    font-family: 'Hind Siliguri', 'Noto Sans Bengali', system-ui, sans-serif;
+    font-size: 16px; line-height: 1.6; color: var(--ink); background: var(--blue-50);
+  }
+  button, input { font-family: inherit; font-size: inherit; }
+  :focus-visible { outline: 3px solid var(--blue-500); outline-offset: 2px; }
+  [hidden] { display: none !important; }
+
+  /* হেডার */
+  .topbar { background: var(--navy-900); color: var(--white); }
+  .topbar-inner {
+    max-width: 1000px; margin: 0 auto; padding: 14px 24px;
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  }
+  .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .logo { width: 40px; height: 40px; border-radius: 10px; flex: none; background: var(--white); display: grid; place-items: center; }
+  .logo svg { width: 22px; height: 22px; fill: var(--navy-900); }
+  .brand h1 { margin: 0; font-size: 19px; font-weight: 600; line-height: 1.3; }
+  .brand p { margin: 0; font-size: 13px; color: #B7C6E4; line-height: 1.3; }
+  .topActions { display: flex; gap: 8px; }
+  .ghost {
+    background: transparent; color: var(--white); border: 1px solid rgba(255,255,255,.45);
+    border-radius: 8px; padding: 7px 14px; cursor: pointer; font-size: 14px; white-space: nowrap; text-decoration: none;
+  }
+  .ghost:hover { background: rgba(255,255,255,.12); }
+  .ghost:focus-visible { outline-color: var(--white); }
+
+  main { max-width: 1000px; margin: 0 auto; padding: 24px; }
+  .card { background: var(--white); border: 1px solid var(--line); border-radius: 12px; }
+
+  /* লগইন */
+  #login { max-width: 420px; margin: 40px auto; padding: 26px; }
+  #login h2 { margin: 0 0 4px; font-size: 20px; font-weight: 600; color: var(--navy-900); }
+  #login p { margin: 0 0 16px; color: var(--muted); font-size: 15px; }
+  #login input {
+    width: 100%; padding: 11px 14px; border: 1px solid var(--line); border-radius: 8px;
+  }
+  #login input:focus { outline: none; border-color: var(--blue-500); box-shadow: 0 0 0 3px rgba(47,111,222,.2); }
+  .primary {
+    margin-top: 12px; width: 100%; padding: 11px 16px; border: none; border-radius: 8px;
+    background: var(--navy-800); color: var(--white); font-weight: 500; cursor: pointer;
+  }
+  .primary:hover { background: var(--navy-700); }
+  .primary:disabled { background: var(--disabled); cursor: default; }
+  #loginError { margin-top: 10px; color: var(--danger); font-size: 14px; min-height: 1em; }
+
+  /* ট্যাব */
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 16px; overflow-x: auto; }
+  .tab {
+    background: none; border: none; padding: 12px 18px; cursor: pointer; color: var(--muted);
+    font-weight: 500; border-bottom: 3px solid transparent; margin-bottom: -1px; white-space: nowrap;
+  }
+  .tab:hover { color: var(--navy-800); }
+  .tab[aria-selected="true"] { color: var(--navy-900); border-bottom-color: var(--navy-800); }
+  .badge {
+    display: inline-block; min-width: 22px; padding: 0 7px; margin-left: 6px; border-radius: 11px;
+    background: var(--blue-100); color: var(--navy-800); font-size: 13px; text-align: center;
+  }
+  .tab[aria-selected="true"] .badge { background: var(--navy-800); color: var(--white); }
+
+  .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+  .toolbar p { margin: 0; color: var(--muted); font-size: 14px; }
+  .toolbar label { font-size: 14px; color: var(--ink); display: flex; align-items: center; gap: 6px; cursor: pointer; }
+  .toolbar button {
+    background: var(--white); color: var(--navy-800); border: 1.5px solid var(--navy-800);
+    border-radius: 8px; padding: 6px 14px; cursor: pointer; font-size: 14px; font-weight: 500;
+  }
+  .toolbar button:hover { background: var(--blue-50); }
+
+  /* টেবিল */
+  .scroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; min-width: 640px; }
+  th, td { text-align: left; padding: 12px 18px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 14px; font-weight: 600; color: var(--navy-900); background: var(--blue-50); white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  td.q { overflow-wrap: anywhere; min-width: 220px; }
+  td.time { color: var(--muted); font-size: 14px; white-space: nowrap; }
+  td a.phone { color: var(--navy-800); font-weight: 600; text-decoration: none; white-space: nowrap; }
+  td a.phone:hover { text-decoration: underline; }
+  tr.done td { color: var(--muted); }
+  tr.done td a.phone { color: var(--muted); font-weight: 500; }
+  .count {
+    display: inline-block; min-width: 28px; padding: 0 8px; border-radius: 12px; text-align: center;
+    background: var(--blue-100); color: var(--navy-900); font-weight: 600; font-size: 14px;
+  }
+  .act {
+    background: var(--white); color: var(--navy-800); border: 1px solid var(--navy-800);
+    border-radius: 6px; padding: 4px 12px; cursor: pointer; font-size: 14px; white-space: nowrap;
+  }
+  .act:hover { background: var(--blue-50); }
+  .act.danger { color: var(--danger); border-color: #EBC5C2; }
+  .act.danger:hover { background: #FDECEA; }
+  .act:disabled { color: var(--disabled); border-color: var(--line); cursor: default; background: var(--white); }
+  .tag-done { display: inline-block; padding: 1px 10px; border-radius: 12px; background: var(--ok-bg); color: var(--ok); font-size: 13px; margin-right: 8px; }
+
+  .empty { padding: 44px 24px; text-align: center; color: var(--muted); }
+  .empty strong { display: block; color: var(--ink); font-weight: 600; margin-bottom: 4px; }
+  #status { padding: 10px 18px; font-size: 14px; color: var(--danger); }
+  #status:empty { display: none; }
+
+  @media (max-width: 700px) {
+    main { padding: 14px; }
+    .topbar-inner { padding: 12px 16px; }
+    .brand p { display: none; }
+    table { min-width: 0; }
+    thead { display: none; }
+    table, tbody, tr, td { display: block; width: 100%; }
+    tr { padding: 12px 16px; border-bottom: 1px solid var(--line); }
+    tr:last-child { border-bottom: none; }
+    td { border: none; padding: 3px 0; min-width: 0 !important; white-space: normal !important; }
+    td[data-label]::before {
+      content: attr(data-label) ": "; color: var(--muted); font-size: 13px; font-weight: 400;
+    }
+    td.q { font-weight: 500; }
+    tr td:last-child { padding-top: 8px; }
+  }
+</style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <div class="logo" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M4 3h16a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H9l-5 4v-4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/></svg>
+        </div>
+        <div>
+          <h1>দোকানদারের রিপোর্ট</h1>
+          <p>কাস্টমারের অনুরোধ ও বটের না-পারা প্রশ্ন</p>
+        </div>
+      </div>
+      <div class="topActions" id="topActions" hidden>
+        <a class="ghost" href="/">চ্যাট দেখুন</a>
+        <button class="ghost" id="logoutBtn" type="button">বের হন</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- লগইন: Admin key চাওয়া হয়, ঠিক হলে রিপোর্ট খোলে -->
+    <section class="card" id="login">
+      <h2>Admin key দিন</h2>
+      <p>রিপোর্ট দেখতে আপনার Admin key লাগবে।</p>
+      <input id="keyInput" type="password" placeholder="Admin key" aria-label="Admin key" autocomplete="off">
+      <button class="primary" id="loginBtn" type="button">প্রবেশ করুন</button>
+      <div id="loginError" role="alert"></div>
+    </section>
+
+    <section id="report" hidden>
+      <div class="tabs" role="tablist">
+        <button class="tab" role="tab" id="tabHandoff" aria-selected="true" type="button">ফোন অনুরোধ<span class="badge" id="badgeHandoff">0</span></button>
+        <button class="tab" role="tab" id="tabUnanswered" aria-selected="false" type="button">উত্তর না পাওয়া প্রশ্ন<span class="badge" id="badgeUnanswered">0</span></button>
+      </div>
+
+      <div class="card">
+        <div class="toolbar">
+          <p id="toolbarHint"></p>
+          <div style="display:flex; gap:12px; align-items:center;">
+            <label id="showDoneWrap"><input type="checkbox" id="showDone"> সম্পন্নগুলোও দেখুন</label>
+            <button id="refreshBtn" type="button">নতুন করে আনুন</button>
+          </div>
+        </div>
+        <div id="status" role="alert"></div>
+        <div class="scroll" id="tableWrap"></div>
+      </div>
+    </section>
+  </main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let tab = 'handoff';              // এখন কোন ট্যাব খোলা
+let handoffs = [], unanswered = [];
+
+function getKey() { return sessionStorage.getItem('adminKey') || ''; }
+function setKey(k) { sessionStorage.setItem('adminKey', k); }
+function clearKey() { sessionStorage.removeItem('adminKey'); }
+
+// সব রিকোয়েস্ট এখান দিয়ে যায়; ভুল key হলে (401) লগইনে ফেরত পাঠায়
+async function api(path, options = {}) {
+  const res = await fetch(path, {
+    ...options,
+    headers: { 'Content-Type': 'application/json', 'X-Admin-Key': getKey(), ...(options.headers || {}) }
+  });
+  const data = await res.json().catch(() => ({}));
+  if (res.status === 401 || res.status === 503) {
+    const err = new Error(data.detail || 'অনুমতি নেই');
+    err.auth = true;
+    throw err;
+  }
+  if (!res.ok) throw new Error(data.detail || 'একটা সমস্যা হয়েছে');
+  return data;
+}
+
+function showLogin(message) {
+  clearKey();
+  $('report').hidden = true;
+  $('topActions').hidden = true;
+  $('login').hidden = false;
+  $('loginError').textContent = message || '';
+  $('keyInput').value = '';
+  $('keyInput').focus();
+}
+
+async function loadAll() {
+  $('status').textContent = '';
+  try {
+    const [h, u] = await Promise.all([api('/admin/handoffs'), api('/admin/unanswered')]);
+    handoffs = h.handoffs || [];
+    unanswered = u.unanswered || [];
+    $('login').hidden = true;
+    $('report').hidden = false;
+    $('topActions').hidden = false;
+    render();
+  } catch (e) {
+    if (e.auth) { showLogin(e.message); return; }
+    $('report').hidden = false;
+    $('status').textContent = e.message + ' — আবার চেষ্টা করুন।';
+  }
+}
+
+function el(tag, props = {}, ...kids) {
+  const n = document.createElement(tag);
+  Object.assign(n, props);
+  kids.forEach(k => n.append(k));
+  return n;
+}
+
+function lab(td, text) { td.setAttribute('data-label', text); return td; }
+
+function emptyBox(title, text) {
+  const d = el('div', { className: 'empty' });
+  d.append(el('strong', { textContent: title }), text);
+  return d;
+}
+
+function render() {
+  const pending = handoffs.filter(x => !x.done).length;
+  $('badgeHandoff').textContent = pending;
+  $('badgeUnanswered').textContent = unanswered.length;
+  $('tabHandoff').setAttribute('aria-selected', tab === 'handoff');
+  $('tabUnanswered').setAttribute('aria-selected', tab === 'unanswered');
+  $('showDoneWrap').hidden = tab !== 'handoff';
+
+  const wrap = $('tableWrap');
+  wrap.textContent = '';
+  wrap.scrollLeft = 0;
+  if (tab === 'handoff') renderHandoffs(wrap); else renderUnanswered(wrap);
+}
+
+function renderHandoffs(wrap) {
+  $('toolbarHint').textContent = 'যারা উত্তর পায়নি আর ফোন নম্বর রেখে গেছে। কল করার পর "যোগাযোগ হয়েছে" চাপুন।';
+  const showDone = $('showDone').checked;
+  const rows = handoffs.filter(x => showDone || !x.done);
+  if (!rows.length) {
+    wrap.append(emptyBox(
+      handoffs.length ? 'সব অনুরোধে যোগাযোগ হয়ে গেছে' : 'এখনো কোনো ফোন অনুরোধ আসেনি',
+      handoffs.length ? 'পুরনোগুলো দেখতে ওপরের বক্সে টিক দিন।' : 'বট উত্তর দিতে না পারলে কাস্টমার এখানে নম্বর রেখে যাবে।'
+    ));
+    return;
+  }
+  const table = el('table');
+  const head = el('tr');
+  ['সময়', 'ফোন', 'কাস্টমারের প্রশ্ন', ''].forEach(t => head.append(el('th', { textContent: t })));
+  table.append(el('thead', {}, head));
+  const body = el('tbody');
+  rows.forEach(item => {
+    const tr = el('tr', { className: item.done ? 'done' : '' });
+    tr.append(lab(el('td', { className: 'time', textContent: item.time }), 'সময়'));
+    const phoneCell = lab(el('td'), 'ফোন');
+    // tel: লিংকে শুধু সংখ্যা আর + রাখা হয়
+    phoneCell.append(el('a', { className: 'phone', href: 'tel:' + String(item.phone).replace(/[^0-9+]/g, ''), textContent: item.phone }));
+    tr.append(phoneCell);
+    tr.append(lab(el('td', { className: 'q', textContent: item.question }), 'প্রশ্ন'));
+    const actCell = el('td', { style: 'white-space:nowrap' });
+    if (item.done) actCell.append(el('span', { className: 'tag-done', textContent: 'যোগাযোগ হয়েছে' }));
+    const btn = el('button', { className: 'act', type: 'button', textContent: item.done ? 'আবার খুলুন' : 'যোগাযোগ হয়েছে' });
+    btn.onclick = () => toggleDone(item, btn);
+    actCell.append(btn);
+    tr.append(actCell);
+    body.append(tr);
+  });
+  table.append(body);
+  wrap.append(table);
+}
+
+function renderUnanswered(wrap) {
+  $('toolbarHint').textContent = 'বট যেসব প্রশ্নের উত্তর ডকুমেন্টে পায়নি। এই তথ্য ডকুমেন্টে যোগ করলে বট পরের বার উত্তর দিতে পারবে।';
+  if (!unanswered.length) {
+    wrap.append(emptyBox('এখনো কোনো প্রশ্ন আটকায়নি', 'বট কোনো প্রশ্নের উত্তর না দিতে পারলে সেটা এখানে জমা হবে।'));
+    return;
+  }
+  const table = el('table');
+  const head = el('tr');
+  ['প্রশ্ন', 'কতবার', 'শেষবার', ''].forEach(t => head.append(el('th', { textContent: t })));
+  table.append(el('thead', {}, head));
+  const body = el('tbody');
+  unanswered.forEach(item => {
+    const tr = el('tr');
+    tr.append(lab(el('td', { className: 'q', textContent: item.question }), 'প্রশ্ন'));
+    tr.append(lab(el('td', {}, el('span', { className: 'count', textContent: item.count })), 'কতবার'));
+    tr.append(lab(el('td', { className: 'time', textContent: item.last }), 'শেষবার'));
+    const btn = el('button', { className: 'act danger', type: 'button', textContent: 'তালিকা থেকে সরান' });
+    btn.onclick = () => removeUnanswered(item, btn);
+    tr.append(el('td', { style: 'white-space:nowrap' }, btn));
+    body.append(tr);
+  });
+  table.append(body);
+  wrap.append(table);
+}
+
+async function toggleDone(item, btn) {
+  btn.disabled = true;
+  try {
+    const updated = await api('/admin/handoffs/' + item.id, { method: 'PATCH', body: JSON.stringify({ done: !item.done }) });
+    item.done = updated.done;
+    $('status').textContent = '';
+    render();
+  } catch (e) {
+    if (e.auth) { showLogin(e.message); return; }
+    $('status').textContent = e.message;
+    btn.disabled = false;
+  }
+}
+
+async function removeUnanswered(item, btn) {
+  if (!confirm('এই প্রশ্নটা তালিকা থেকে সরাবেন? (বটের কোনো ডকুমেন্টে হাত পড়বে না)')) return;
+  btn.disabled = true;
+  try {
+    await api('/admin/unanswered/' + item.id, { method: 'DELETE' });
+    unanswered = unanswered.filter(x => x.id !== item.id);
+    $('status').textContent = '';
+    render();
+  } catch (e) {
+    if (e.auth) { showLogin(e.message); return; }
+    $('status').textContent = e.message;
+    btn.disabled = false;
+  }
+}
+
+async function tryLogin() {
+  const k = $('keyInput').value.trim();
+  if (!k) { $('loginError').textContent = 'Admin key লিখুন।'; return; }
+  setKey(k);
+  $('loginBtn').disabled = true;
+  $('loginError').textContent = '';
+  await loadAll();
+  $('loginBtn').disabled = false;
+}
+
+$('loginBtn').onclick = tryLogin;
+$('keyInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') tryLogin(); });
+$('logoutBtn').onclick = () => showLogin('');
+$('refreshBtn').onclick = loadAll;
+$('showDone').onchange = render;
+$('tabHandoff').onclick = () => { tab = 'handoff'; render(); };
+$('tabUnanswered').onclick = () => { tab = 'unanswered'; render(); };
+
+// আগে এই ট্যাবে key দেওয়া থাকলে সরাসরি রিপোর্ট খোলে
+if (getKey()) loadAll(); else $('keyInput').focus();
+</script>
+</body>
+</html>
