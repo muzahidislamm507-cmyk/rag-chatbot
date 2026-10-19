@@ -44,6 +44,7 @@ input[type=number]{width:96px}
 <body>
 <header>
   <span class="logo">UrbanWear Admin</span>
+  <a href="/report">Customer requests</a>
   <a href="store.html">View store</a>
 </header>
 <main>
@@ -77,7 +78,7 @@ const money = n => CUR + (n || 0).toLocaleString("en-US");
 const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
 let KEY = "";
-try { KEY = sessionStorage.getItem("uw_key") || ""; } catch (e) {}
+try { KEY = sessionStorage.getItem("uw_key") || sessionStorage.getItem("adminKey") || ""; } catch (e) {}
 let orders = [], products = [];
 
 async function call(path, opts = {}) {
@@ -127,7 +128,7 @@ function render() {
 
 $("unlock").onclick = () => {
   KEY = $("key").value.trim();
-  try { sessionStorage.setItem("uw_key", KEY); } catch (e) {}
+  try { sessionStorage.setItem("uw_key", KEY); sessionStorage.setItem("adminKey", KEY); } catch (e) {}
   $("err").textContent = "";
   load();
 };
