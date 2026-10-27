@@ -626,6 +626,40 @@ def looks_unanswered(text: str) -> bool:
     return any(h in t for h in _NOT_FOUND_HINTS)
 
 
+# ---------------------------------------------------------
+# #Memory Fix: আগের প্রশ্ন শুধু তখনই জোড়া হবে যখন নতুন প্রশ্নটা আসলেই "ফলো-আপ"
+# আগে প্রতিটা নতুন প্রশ্নের সাথে আগের প্রশ্ন জুড়ে খোঁজা হতো, তাই আলাদা বিষয়ের প্রশ্নেও
+# আগের বিষয়ের টুকরো উঠে আসত (যেমন "CEO কে?" জিজ্ঞেস করলে রিটার্ন পলিসি আসত)।
+# ফলো-আপ চেনার সহজ নিয়ম: প্রশ্নে "এটা, এর, তার, আর, it, this..." জাতীয় শব্দ থাকলে।
+# ---------------------------------------------------------
+_FOLLOWUP_WORDS = {
+    # বাংলা
+    "এটা", "এটি", "এটার", "এটাকে", "এটাতে", "ওটা", "ওটি", "ওটার", "সেটা", "সেটি", "সেটার",
+    "এগুলো", "ওগুলো", "সেগুলো", "এই", "ওই", "এর", "ওর", "তার", "তাদের", "এদের", "এতে", "তাতে",
+    "তাহলে", "আর", "এছাড়া", "এছাড়াও",
+    # English
+    "it", "its", "this", "that", "these", "those", "they", "them", "their", "also",
+}
+_FOLLOWUP_PHRASES = ("what about", "how about", "and what", "and the")
+_STRIP_PUNCT = ".,;:!?()[]{}\"'\u201c\u201d\u2018\u2019\u0964"
+
+
+def is_followup(query: str) -> bool:
+    """নতুন প্রশ্নটা আগের কথার ওপর নির্ভর করে কিনা (সহজ নিয়মে আন্দাজ)।"""
+    q = query.lower().strip()
+    if any(p in q for p in _FOLLOWUP_PHRASES):
+        return True
+    tokens = [t.strip(_STRIP_PUNCT) for t in q.split()]
+    return any(t in _FOLLOWUP_WORDS for t in tokens)
+
+
+def build_retrieval_query(query: str, session) -> str:
+    """ফলো-আপ হলে আগের প্রশ্ন জুড়ে দেয়, নইলে নতুন প্রশ্ন একাই খোঁজে।"""
+    if session and session.last_query and is_followup(query):
+        return f"{session.last_query} {query}"
+    return query
+
+
 def stream_answer_query(query: str, index, chunks: list[Chunk], session: RagSession = None, top_k: int = TOP_K):
     """
     #Streaming Answer: উত্তর একবারে না দিয়ে টুকরো টুকরো (token/chunk) করে yield করে,
@@ -642,9 +676,7 @@ def stream_answer_query(query: str, index, chunks: list[Chunk], session: RagSess
     """
     query = sanitize_query(query)
 
-    retrieval_query = query
-    if session and session.last_query:
-        retrieval_query = f"{session.last_query} {query}"
+    retrieval_query = build_retrieval_query(query, session)
 
     relevant = retrieve_relevant_chunks(retrieval_query, index, chunks, top_k=top_k)
     if not relevant:
@@ -724,9 +756,7 @@ def answer_query(query: str, index, chunks: list[Chunk], session: RagSession = N
     session দিলে multi-turn (আগের কথোপকথন মনে রাখবে), না দিলে single-turn (আগের মতোই)।
     """
     # follow-up প্রশ্নে ("তার পরে কী হয়েছিল?") ভালো retrieval পেতে আগের প্রশ্নটাও যোগ করা হয়
-    retrieval_query = query
-    if session and session.last_query:
-        retrieval_query = f"{session.last_query} {query}"
+    retrieval_query = build_retrieval_query(query, session)
 
     relevant = retrieve_relevant_chunks(retrieval_query, index, chunks, top_k=top_k)
     if not relevant:
